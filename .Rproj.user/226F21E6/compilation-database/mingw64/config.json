@@ -1,0 +1,31 @@
+{
+    "args": [
+        "-std=gnu++11",
+        "-Id:/R-4.0.0/include",
+        "-DNDEBUG",
+        "-ID:/R-4.0.0/library/Rcpp/include",
+        "-ID:/R-4.0.0/library/BH/include",
+        "-ID:/R-4.0.0/library/bigmemory/include",
+        "-DEIGEN_DONT_VECTORIZE",
+        "-nostdinc",
+        "-U_MSC_VER",
+        "-D__GNUC__=8",
+        "-D__GNUC_MINOR__=3",
+        "-D__GNUC_PATCHLEVEL__=0",
+        "-IC:/rtools40/mingw64/include/c++/8.3.0",
+        "-IC:/rtools40/mingw64/include/c++/8.3.0/x86_64-w64-mingw32",
+        "-IC:/rtools40/mingw64/include/c++/8.3.0/backward",
+        "-IC:/rtools40/mingw64/lib/gcc/x86_64-w64-mingw32/8.3.0/include",
+        "-IC:/rtools40/mingw64/include",
+        "-IC:/rtools40/mingw64/lib/gcc/x86_64-w64-mingw32/8.3.0/include-fixed",
+        "-IC:/rtools40/mingw64/x86_64-w64-mingw32/include",
+        "-include",
+        "D:/github/CasPhy/.Rproj.user/226F21E6/compilation-database/mingw64/cpp-definitions.h"
+    ],
+    "pch": "Rcpp",
+    "is_cpp": true,
+    "hash": "1744893688",
+    "compiler": "15831801441610807778",
+    "rversion": "4.0.0",
+    "dbversion": 4
+}

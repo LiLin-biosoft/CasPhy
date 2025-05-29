@@ -1,0 +1,439 @@
+[
+    {
+        "file": "D:/github/CasPhy/src/functions.cpp",
+        "file_last_write": 1744534683.0,
+        "definitions": [
+            {
+                "usr": "c:@F@mutationNested#$@N@Rcpp@S@Vector>#VI13#@N@Rcpp@ST>1#T@PreserveStorage#S0_#",
+                "kind": 6,
+                "parent_name": "",
+                "name": "mutationNested(Rcpp::IntegerVector, Rcpp::IntegerVector)",
+                "file": "D:/github/CasPhy/src/functions.cpp",
+                "line": 10,
+                "column": 5,
+                "hidden": false
+            },
+            {
+                "usr": "c:@F@mutationNestedBit#$@N@Rcpp@S@Vector>#VI13#@N@Rcpp@ST>1#T@PreserveStorage#S0_#",
+                "kind": 6,
+                "parent_name": "",
+                "name": "mutationNestedBit(Rcpp::IntegerVector, Rcpp::IntegerVector)",
+                "file": "D:/github/CasPhy/src/functions.cpp",
+                "line": 22,
+                "column": 5,
+                "hidden": false
+            },
+            {
+                "usr": "c:@F@transitionRoot#$@N@Rcpp@S@Vector>#VI13#@N@Rcpp@ST>1#T@PreserveStorage#I#",
+                "kind": 6,
+                "parent_name": "",
+                "name": "transitionRoot(Rcpp::IntegerVector, int)",
+                "file": "D:/github/CasPhy/src/functions.cpp",
+                "line": 37,
+                "column": 5,
+                "hidden": false
+            },
+            {
+                "usr": "c:@F@matCoding#$@N@Rcpp@S@Matrix>#VI13#@N@Rcpp@ST>1#T@PreserveStorage#$@N@Rcpp@S@Vector>#VI13#@N@Rcpp@ST>1#T@PreserveStorage#",
+                "kind": 6,
+                "parent_name": "",
+                "name": "matCoding(Rcpp::IntegerMatrix, Rcpp::IntegerVector)",
+                "file": "D:/github/CasPhy/src/functions.cpp",
+                "line": 50,
+                "column": 15,
+                "hidden": false
+            },
+            {
+                "usr": "c:@F@int2binary#$@N@Rcpp@S@Vector>#VI13#@N@Rcpp@ST>1#T@PreserveStorage#I#",
+                "kind": 6,
+                "parent_name": "",
+                "name": "int2binary(Rcpp::IntegerVector, int)",
+                "file": "D:/github/CasPhy/src/functions.cpp",
+                "line": 67,
+                "column": 15,
+                "hidden": false
+            },
+            {
+                "usr": "c:@F@int2idx#$@N@Rcpp@S@Vector>#VI13#@N@Rcpp@ST>1#T@PreserveStorage#",
+                "kind": 6,
+                "parent_name": "",
+                "name": "int2idx(Rcpp::IntegerVector)",
+                "file": "D:/github/CasPhy/src/functions.cpp",
+                "line": 85,
+                "column": 18,
+                "hidden": false
+            },
+            {
+                "usr": "c:@F@idx2int#$@N@Rcpp@S@Vector>#VI13#@N@Rcpp@ST>1#T@PreserveStorage#I#",
+                "kind": 6,
+                "parent_name": "",
+                "name": "idx2int(Rcpp::IntegerVector, int)",
+                "file": "D:/github/CasPhy/src/functions.cpp",
+                "line": 99,
+                "column": 15,
+                "hidden": false
+            },
+            {
+                "usr": "c:@F@locusAND#$@N@Rcpp@S@Vector>#VI13#@N@Rcpp@ST>1#T@PreserveStorage#S0_#",
+                "kind": 6,
+                "parent_name": "",
+                "name": "locusAND(Rcpp::IntegerVector, Rcpp::IntegerVector)",
+                "file": "D:/github/CasPhy/src/functions.cpp",
+                "line": 112,
+                "column": 15,
+                "hidden": false
+            },
+            {
+                "usr": "c:@F@locusXOR#$@N@Rcpp@S@Vector>#VI13#@N@Rcpp@ST>1#T@PreserveStorage#S0_#",
+                "kind": 6,
+                "parent_name": "",
+                "name": "locusXOR(Rcpp::IntegerVector, Rcpp::IntegerVector)",
+                "file": "D:/github/CasPhy/src/functions.cpp",
+                "line": 122,
+                "column": 15,
+                "hidden": false
+            },
+            {
+                "usr": "c:@F@locusSUM#$@N@Rcpp@S@Vector>#VI13#@N@Rcpp@ST>1#T@PreserveStorage#$@N@Rcpp@S@Vector>#VI14#@N@Rcpp@ST>1#T@PreserveStorage#",
+                "kind": 6,
+                "parent_name": "",
+                "name": "locusSUM(Rcpp::IntegerVector, Rcpp::NumericVector)",
+                "file": "D:/github/CasPhy/src/functions.cpp",
+                "line": 132,
+                "column": 8,
+                "hidden": false
+            },
+            {
+                "usr": "c:@F@locusSUMint#$@N@Rcpp@S@Vector>#VI13#@N@Rcpp@ST>1#T@PreserveStorage#",
+                "kind": 6,
+                "parent_name": "",
+                "name": "locusSUMint(Rcpp::IntegerVector)",
+                "file": "D:/github/CasPhy/src/functions.cpp",
+                "line": 146,
+                "column": 5,
+                "hidden": false
+            },
+            {
+                "usr": "c:@F@reOrderEdge#$@N@Rcpp@S@Matrix>#VI13#@N@Rcpp@ST>1#T@PreserveStorage#I#",
+                "kind": 6,
+                "parent_name": "",
+                "name": "reOrderEdge(Rcpp::IntegerMatrix, int)",
+                "file": "D:/github/CasPhy/src/functions.cpp",
+                "line": 160,
+                "column": 15,
+                "hidden": false
+            },
+            {
+                "usr": "c:@F@charAncestral#$@N@Rcpp@S@Matrix>#VI13#@N@Rcpp@ST>1#T@PreserveStorage#",
+                "kind": 6,
+                "parent_name": "",
+                "name": "charAncestral(Rcpp::IntegerMatrix)",
+                "file": "D:/github/CasPhy/src/functions.cpp",
+                "line": 188,
+                "column": 15,
+                "hidden": false
+            },
+            {
+                "usr": "c:@F@bitAncestral#$@N@Rcpp@S@Matrix>#VI13#@N@Rcpp@ST>1#T@PreserveStorage#",
+                "kind": 6,
+                "parent_name": "",
+                "name": "bitAncestral(Rcpp::IntegerMatrix)",
+                "file": "D:/github/CasPhy/src/functions.cpp",
+                "line": 206,
+                "column": 15,
+                "hidden": false
+            },
+            {
+                "usr": "c:@F@countApo#$@N@Rcpp@S@Vector>#VI13#@N@Rcpp@ST>1#T@PreserveStorage#S0_#$@N@Rcpp@S@Matrix>#VI14#@N@Rcpp@ST>1#T@PreserveStorage#",
+                "kind": 6,
+                "parent_name": "",
+                "name": "countApo(Rcpp::IntegerVector, Rcpp::IntegerVector, Rcpp::NumericMatrix)",
+                "file": "D:/github/CasPhy/src/functions.cpp",
+                "line": 220,
+                "column": 8,
+                "hidden": false
+            },
+            {
+                "usr": "c:@F@countApoFloat#$@N@Rcpp@S@Vector>#VI13#@N@Rcpp@ST>1#T@PreserveStorage#S0_#$@N@Rcpp@S@Matrix>#VI14#@N@Rcpp@ST>1#T@PreserveStorage#",
+                "kind": 6,
+                "parent_name": "",
+                "name": "countApoFloat(Rcpp::IntegerVector, Rcpp::IntegerVector, Rcpp::NumericMatrix)",
+                "file": "D:/github/CasPhy/src/functions.cpp",
+                "line": 231,
+                "column": 7,
+                "hidden": false
+            },
+            {
+                "usr": "c:@F@greedyJoinEdge#$@N@Rcpp@S@Matrix>#VI13#@N@Rcpp@ST>1#T@PreserveStorage#$@N@Rcpp@S@Matrix>#VI14#@N@Rcpp@ST>1#T@PreserveStorage#b#",
+                "kind": 6,
+                "parent_name": "",
+                "name": "greedyJoinEdge(Rcpp::IntegerMatrix, Rcpp::NumericMatrix, bool)",
+                "file": "D:/github/CasPhy/src/functions.cpp",
+                "line": 243,
+                "column": 15,
+                "hidden": false
+            },
+            {
+                "usr": "c:@F@countApoBit#$@N@Rcpp@S@Vector>#VI13#@N@Rcpp@ST>1#T@PreserveStorage#S0_#$@N@Rcpp@S@Vector>#VI14#@N@Rcpp@ST>1#T@PreserveStorage#",
+                "kind": 6,
+                "parent_name": "",
+                "name": "countApoBit(Rcpp::IntegerVector, Rcpp::IntegerVector, Rcpp::NumericVector)",
+                "file": "D:/github/CasPhy/src/functions.cpp",
+                "line": 354,
+                "column": 7,
+                "hidden": false
+            },
+            {
+                "usr": "c:@F@greedyJoinEdgeBit#$@N@Rcpp@S@Matrix>#VI13#@N@Rcpp@ST>1#T@PreserveStorage#$@N@Rcpp@S@Vector>#VI14#@N@Rcpp@ST>1#T@PreserveStorage#b#",
+                "kind": 6,
+                "parent_name": "",
+                "name": "greedyJoinEdgeBit(Rcpp::IntegerMatrix, Rcpp::NumericVector, bool)",
+                "file": "D:/github/CasPhy/src/functions.cpp",
+                "line": 368,
+                "column": 15,
+                "hidden": false
+            },
+            {
+                "usr": "c:@F@collapseBranch#$@N@Rcpp@S@Matrix>#VI13#@N@Rcpp@ST>1#T@PreserveStorage#I#",
+                "kind": 6,
+                "parent_name": "",
+                "name": "collapseBranch(Rcpp::IntegerMatrix, int)",
+                "file": "D:/github/CasPhy/src/functions.cpp",
+                "line": 476,
+                "column": 15,
+                "hidden": false
+            },
+            {
+                "usr": "c:@F@nodeKeep#$@N@Rcpp@S@Matrix>#VI13#@N@Rcpp@ST>1#T@PreserveStorage#I#S0_#S0_#I#",
+                "kind": 6,
+                "parent_name": "",
+                "name": "nodeKeep(Rcpp::IntegerMatrix, int, Rcpp::IntegerMatrix, Rcpp::IntegerMatrix, int)",
+                "file": "D:/github/CasPhy/src/functions.cpp",
+                "line": 492,
+                "column": 15,
+                "hidden": false
+            },
+            {
+                "usr": "c:@F@nodeKeepBit#$@N@Rcpp@S@Matrix>#VI13#@N@Rcpp@ST>1#T@PreserveStorage#I#S0_#S0_#I#",
+                "kind": 6,
+                "parent_name": "",
+                "name": "nodeKeepBit(Rcpp::IntegerMatrix, int, Rcpp::IntegerMatrix, Rcpp::IntegerMatrix, int)",
+                "file": "D:/github/CasPhy/src/functions.cpp",
+                "line": 527,
+                "column": 15,
+                "hidden": false
+            },
+            {
+                "usr": "c:@F@imputeVector#$@N@Rcpp@S@Vector>#VI13#@N@Rcpp@ST>1#T@PreserveStorage#S0_#",
+                "kind": 6,
+                "parent_name": "",
+                "name": "imputeVector(Rcpp::IntegerVector, Rcpp::IntegerVector)",
+                "file": "D:/github/CasPhy/src/functions.cpp",
+                "line": 562,
+                "column": 15,
+                "hidden": false
+            },
+            {
+                "usr": "c:@F@markDup#I#$@N@Rcpp@S@Matrix>#VI13#@N@Rcpp@ST>1#T@PreserveStorage#",
+                "kind": 6,
+                "parent_name": "",
+                "name": "markDup(int, Rcpp::IntegerMatrix)",
+                "file": "D:/github/CasPhy/src/functions.cpp",
+                "line": 576,
+                "column": 5,
+                "hidden": false
+            },
+            {
+                "usr": "c:@F@markDupBit#I#$@N@Rcpp@S@Matrix>#VI13#@N@Rcpp@ST>1#T@PreserveStorage#",
+                "kind": 6,
+                "parent_name": "",
+                "name": "markDupBit(int, Rcpp::IntegerMatrix)",
+                "file": "D:/github/CasPhy/src/functions.cpp",
+                "line": 627,
+                "column": 5,
+                "hidden": false
+            },
+            {
+                "usr": "c:@F@edgeEvo#$@N@Rcpp@S@Matrix>#VI13#@N@Rcpp@ST>1#T@PreserveStorage#S0_#I#",
+                "kind": 6,
+                "parent_name": "",
+                "name": "edgeEvo(Rcpp::IntegerMatrix, Rcpp::IntegerMatrix, int)",
+                "file": "D:/github/CasPhy/src/functions.cpp",
+                "line": 647,
+                "column": 15,
+                "hidden": false
+            },
+            {
+                "usr": "c:@F@printB#I#",
+                "kind": 6,
+                "parent_name": "",
+                "name": "printB(int)",
+                "file": "D:/github/CasPhy/src/functions.cpp",
+                "line": 660,
+                "column": 6,
+                "hidden": false
+            },
+            {
+                "usr": "c:@F@edge2vector#$@N@Rcpp@S@Matrix>#VI13#@N@Rcpp@ST>1#T@PreserveStorage#I#",
+                "kind": 6,
+                "parent_name": "",
+                "name": "edge2vector(Rcpp::IntegerMatrix, int)",
+                "file": "D:/github/CasPhy/src/functions.cpp",
+                "line": 669,
+                "column": 15,
+                "hidden": false
+            },
+            {
+                "usr": "c:@F@findNeighborWeighted#$@N@Rcpp@S@Matrix>#VI13#@N@Rcpp@ST>1#T@PreserveStorage#I#$@N@Rcpp@S@Vector>#VI14#@N@Rcpp@ST>1#T@PreserveStorage#I#d#d#b#",
+                "kind": 6,
+                "parent_name": "",
+                "name": "findNeighborWeighted(Rcpp::IntegerMatrix, int, Rcpp::NumericVector, int, double, double, bool)",
+                "file": "D:/github/CasPhy/src/functions.cpp",
+                "line": 689,
+                "column": 15,
+                "hidden": false
+            },
+            {
+                "usr": "c:@F@findNeighborUnweighted#$@N@Rcpp@S@Matrix>#VI13#@N@Rcpp@ST>1#T@PreserveStorage#I#I#d#I#b#",
+                "kind": 6,
+                "parent_name": "",
+                "name": "findNeighborUnweighted(Rcpp::IntegerMatrix, int, int, double, int, bool)",
+                "file": "D:/github/CasPhy/src/functions.cpp",
+                "line": 776,
+                "column": 15,
+                "hidden": false
+            },
+            {
+                "usr": "c:@F@findNeighborWeightedParallel#I#$@N@Rcpp@S@Matrix>#VI13#@N@Rcpp@ST>1#T@PreserveStorage#I#$@N@Rcpp@S@Vector>#VI14#@N@Rcpp@ST>1#T@PreserveStorage#I#d#d#",
+                "kind": 6,
+                "parent_name": "",
+                "name": "findNeighborWeightedParallel(int, Rcpp::IntegerMatrix, int, Rcpp::NumericVector, int, double, double)",
+                "file": "D:/github/CasPhy/src/functions.cpp",
+                "line": 861,
+                "column": 15,
+                "hidden": false
+            },
+            {
+                "usr": "c:@F@findNeighborUnweightedParallel#I#$@N@Rcpp@S@Matrix>#VI13#@N@Rcpp@ST>1#T@PreserveStorage#I#I#d#I#",
+                "kind": 6,
+                "parent_name": "",
+                "name": "findNeighborUnweightedParallel(int, Rcpp::IntegerMatrix, int, int, double, int)",
+                "file": "D:/github/CasPhy/src/functions.cpp",
+                "line": 925,
+                "column": 15,
+                "hidden": false
+            },
+            {
+                "usr": "c:@F@tipMergeNeighbor#$@N@Rcpp@S@Matrix>#VI13#@N@Rcpp@ST>1#T@PreserveStorage#d#b#I#b#",
+                "kind": 6,
+                "parent_name": "",
+                "name": "tipMergeNeighbor(Rcpp::IntegerMatrix, double, bool, int, bool)",
+                "file": "D:/github/CasPhy/src/functions.cpp",
+                "line": 987,
+                "column": 15,
+                "hidden": false
+            },
+            {
+                "usr": "c:@F@tipMergeNeighborBig#*$@S@SEXPREC#$@N@Rcpp@S@Vector>#VI13#@N@Rcpp@ST>1#T@PreserveStorage#d#b#I#b#",
+                "kind": 6,
+                "parent_name": "",
+                "name": "tipMergeNeighborBig(SEXP, Rcpp::IntegerVector, double, bool, int, bool)",
+                "file": "D:/github/CasPhy/src/functions.cpp",
+                "line": 1081,
+                "column": 15,
+                "hidden": false
+            },
+            {
+                "usr": "c:@F@nodeDes#$@N@Rcpp@S@Matrix>#VI13#@N@Rcpp@ST>1#T@PreserveStorage#I#I#",
+                "kind": 6,
+                "parent_name": "",
+                "name": "nodeDes(Rcpp::IntegerMatrix, int, int)",
+                "file": "D:/github/CasPhy/src/functions.cpp",
+                "line": 1179,
+                "column": 15,
+                "hidden": false
+            },
+            {
+                "usr": "c:@F@nodeDesBig#$@N@Rcpp@S@Matrix>#VI13#@N@Rcpp@ST>1#T@PreserveStorage#I#I#$@N@std@N@__cxx11@S@basic_string>#C#$@N@std@S@char_traits>#C#$@N@std@S@allocator>#C#I#",
+                "kind": 6,
+                "parent_name": "",
+                "name": "nodeDesBig(Rcpp::IntegerMatrix, int, int, std::string, int)",
+                "file": "D:/github/CasPhy/src/functions.cpp",
+                "line": 1199,
+                "column": 6,
+                "hidden": false
+            },
+            {
+                "usr": "c:@F@findNeighborRangeUnweighted#I#$@N@Rcpp@S@Matrix>#VI13#@N@Rcpp@ST>1#T@PreserveStorage#I#S0_#I#I#d#I#",
+                "kind": 6,
+                "parent_name": "",
+                "name": "findNeighborRangeUnweighted(int, Rcpp::IntegerMatrix, int, Rcpp::IntegerMatrix, int, int, double, int)",
+                "file": "D:/github/CasPhy/src/functions.cpp",
+                "line": 1281,
+                "column": 15,
+                "hidden": false
+            },
+            {
+                "usr": "c:@F@findNeighborRangeWeighted#I#$@N@Rcpp@S@Matrix>#VI13#@N@Rcpp@ST>1#T@PreserveStorage#I#S0_#I#$@N@Rcpp@S@Vector>#VI14#@N@Rcpp@ST>1#T@PreserveStorage#I#d#d#",
+                "kind": 6,
+                "parent_name": "",
+                "name": "findNeighborRangeWeighted(int, Rcpp::IntegerMatrix, int, Rcpp::IntegerMatrix, int, Rcpp::NumericVector, int, double, double)",
+                "file": "D:/github/CasPhy/src/functions.cpp",
+                "line": 1348,
+                "column": 15,
+                "hidden": false
+            },
+            {
+                "usr": "c:@F@imputeMat#I#$@N@Rcpp@S@Matrix>#VI13#@N@Rcpp@ST>1#T@PreserveStorage#S0_#I#",
+                "kind": 6,
+                "parent_name": "",
+                "name": "imputeMat(int, Rcpp::IntegerMatrix, Rcpp::IntegerMatrix, int)",
+                "file": "D:/github/CasPhy/src/functions.cpp",
+                "line": 1419,
+                "column": 15,
+                "hidden": false
+            },
+            {
+                "usr": "c:@F@greedyJoinEdgeBig#$@N@Rcpp@S@Matrix>#VI13#@N@Rcpp@ST>1#T@PreserveStorage#$@N@Rcpp@S@Matrix>#VI14#@N@Rcpp@ST>1#T@PreserveStorage#*$@S@SEXPREC#b#",
+                "kind": 6,
+                "parent_name": "",
+                "name": "greedyJoinEdgeBig(Rcpp::IntegerMatrix, Rcpp::NumericMatrix, SEXP, bool)",
+                "file": "D:/github/CasPhy/src/functions.cpp",
+                "line": 1470,
+                "column": 15,
+                "hidden": false
+            },
+            {
+                "usr": "c:@F@greedyJoinEdgeBitBig#$@N@Rcpp@S@Matrix>#VI13#@N@Rcpp@ST>1#T@PreserveStorage#$@N@Rcpp@S@Vector>#VI14#@N@Rcpp@ST>1#T@PreserveStorage#*$@S@SEXPREC#b#",
+                "kind": 6,
+                "parent_name": "",
+                "name": "greedyJoinEdgeBitBig(Rcpp::IntegerMatrix, Rcpp::NumericVector, SEXP, bool)",
+                "file": "D:/github/CasPhy/src/functions.cpp",
+                "line": 1574,
+                "column": 15,
+                "hidden": false
+            },
+            {
+                "usr": "c:@F@radiusUnweightedParallel#I#$@N@Rcpp@S@Matrix>#VI13#@N@Rcpp@ST>1#T@PreserveStorage#I#I#",
+                "kind": 6,
+                "parent_name": "",
+                "name": "radiusUnweightedParallel(int, Rcpp::IntegerMatrix, int, int)",
+                "file": "D:/github/CasPhy/src/functions.cpp",
+                "line": 1680,
+                "column": 15,
+                "hidden": false
+            },
+            {
+                "usr": "c:@F@radiusWeightedParallel#I#$@N@Rcpp@S@Matrix>#VI13#@N@Rcpp@ST>1#T@PreserveStorage#I#$@N@Rcpp@S@Vector>#VI14#@N@Rcpp@ST>1#T@PreserveStorage#d#",
+                "kind": 6,
+                "parent_name": "",
+                "name": "radiusWeightedParallel(int, Rcpp::IntegerMatrix, int, Rcpp::NumericVector, double)",
+                "file": "D:/github/CasPhy/src/functions.cpp",
+                "line": 1715,
+                "column": 15,
+                "hidden": false
+            }
+        ],
+        "hidden": false
+    }
+]

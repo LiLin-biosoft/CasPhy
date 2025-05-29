@@ -1,0 +1,209 @@
+---
+title: "CasPhy"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{CasPhy}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+CasPhy is a phylogeny reconstruction algorithm for lineage-tracing data. We will show how to use it. `mat1k` contains the mutation profiles of 1000 cells. Each row is an OTU (operational taxonomic unit) and each column is a target site. `-1` is missing data, `0` is un-mutated state and other integers are edited indels. The `rownames` of `mat` must be specified.
+
+```         
+suppressMessages(library(CasPhy))
+suppressMessages(library(RColorBrewer))
+
+data(mat1k)
+mat<-mat1k
+for(i in 1:ncol(mat)){
+  tmp<-sort(unique(c(mat[,i],-1,0)))
+  mat[,i]<-match(mat[,i],tmp)-2
+}
+rownames(mat)<-paste0("C",1:nrow(mat))
+```
+
+First, the missing entries are imputed by `iter.impute.packed`. After imputation, duplicated OTUs are marked and removed using `find.dup`. `find.dup` returns a vector, where the value of ith element is the index of OTU shared the same mutation profiles with the ith OTU.
+
+```         
+imputed<-iter.impute.packed(mat)
+dup_idx<-find.dup(imputed)
+imputed<-imputed[dup_idx==1:length(dup_idx),]
+```
+
+For small dataset, we can use the bottom solver `shared.mutation.join` to reconstruct the phylogeny and insert duplicated OTUs back to the phylogeny by `insert.dup`. The parsimony of the phylogeny can be calculated using `cal.nevo`.
+
+```         
+smj_tree<-shared.mutation.join(imputed)
+smj_tree2<-insert.dup(smj_tree,dup_idx,label=rownames(mat))
+nEvo<-cal.nevo(smj_tree2,mat)
+```
+
+Optionally, we can add the length of edges to the phylogeny according to the number of mutation events along the edge and then collapse edges without mutation events.
+
+```         
+smj_tree2<-collapse.infoless(smj_tree2,nEvo)
+```
+
+The heatmap can be used to see whether the phylogeny explains the data well.
+
+```         
+heatmap(
+  mat+2,
+  Rowv=as.dendrogram(as.hclust.phylo(as.ultrametric(multi2di(smj_tree2)))),
+  Colv=NA,
+  labCol=1:ncol(mat),
+  labRow=NA,
+  cexCol=0.7,
+  scale="none",
+  breaks=0:59,
+  col=c("grey","white",
+        brewer.pal(12,"Paired"),
+        brewer.pal(12,"Set3"),
+        brewer.pal(9,"Set1"),
+        brewer.pal(8,"Set2"),
+        brewer.pal(8,"Accent"),
+        brewer.pal(8,"Dark2"))
+)
+```
+
+Next, we will show how to reconstruct the phylogeny of a larger dataset. We use `ncore` to specify the number of threads used (not available on Windows system).
+
+```         
+data(mat10k)
+mat<-mat10k
+for(i in 1:ncol(mat)){
+  tmp<-sort(unique(c(mat[,i],-1,0)))
+  mat[,i]<-match(mat[,i],tmp)-2
+}
+rownames(mat)<-paste0("C",1:nrow(mat))
+imputed<-iter.impute.packed(mat,ncore=10)
+dup_idx<-find.dup(imputed,ncore=10)
+imputed<-imputed[dup_idx==1:length(dup_idx),]
+```
+
+We use the top solver `split.data` to split the data into small clusters. `radius` means the minimum number of common mutations between neighbors. `p_shared` is the threshold used to break weakly connected OTUs. `radius` and `p_shared` can be used to adjust the sizes of clusters. `splt.summerize` is used to calculate the number of OTUs in each cluster.
+
+```         
+splt<-split.data(imputed,radius=8,p_shared=0.8,ncore=10)
+head(splt.summerize(splt),n=20)
+```
+
+We use `h.partial.join` to reconstruct the phylogeny of each cluster and use `link.hcluster` to link all phylogenies together. Finally, we use `order.tip` to re-order the tip of the phylogeny to match the rownames of `imputed`.
+
+```         
+partial_phys<-h.partial.join(imputed,splt)
+partial_tree<-link.hcluster(partial_phys)
+partial_tree<-order.tip(partial_tree,rownames(imputed))
+partial_tree2<-insert.dup(partial_tree,dup_idx,label=rownames(mat))
+
+nEvo<-cal.nevo(partial_tree2,mat)
+heatmap(
+  mat+2,
+  Rowv=as.dendrogram(as.hclust.phylo(as.ultrametric(multi2di(partial_tree2)))),
+  Colv=NA,
+  labCol=1:ncol(mat),
+  labRow=NA,
+  cexCol=0.7,
+  scale="none",
+  breaks=0:59,
+  col=c("grey","white",
+        brewer.pal(12,"Paired"),
+        brewer.pal(12,"Set3"),
+        brewer.pal(9,"Set1"),
+        brewer.pal(8,"Set2"),
+        brewer.pal(8,"Accent"),
+        brewer.pal(8,"Dark2"))
+)
+```
+
+Next, we will show how to infer the clade support of the phylogeny using bootstrap analysis. Bootstrap analysis starts with the imputed matrix. We randomly generate weights for indels from a uniform distribution. Weights is specified by a matrix. Each row is an indel and each column is a target site.
+
+```         
+nIndel<-max(apply(imputed,2,function(x){
+  length(unique(setdiff(x,c(0,-1))))
+}))
+w<-list()
+set.seed(1)
+for(i in 1:100){
+  w[[i]]<-matrix(runif(nIndel*ncol(imputed))*2,nIndel,ncol(imputed))
+}
+```
+
+Then, we perform bootstrap analysis. We use `h.partial.join.parallel` instead of `h.partial.join`. This is a parallel version of the bottom solver and is more efficient than `h.partial.join` when there are many clusters. The script below runs bootstrap analysis using 10 threads.
+
+```         
+bstrees<-list()
+for(i in 1:100){
+  splt<-split.data(mat=imputed,weight=w[[i]],radius=8,p_shared=0.8,ncore=10)
+  phys<-h.partial.join.parallel(mat=imputed,splt=splt,weight=w[[i]],ncore=10)
+  tmp<-link.hcluster(phys)
+  tmp<-order.tip(tmp,rownames(imputed))
+  bstrees[[i]]<-insert.dup(tmp,dup_idx,label=rownames(mat))
+}
+```
+
+Finally, we calculate the bootstrap values for each node. Bootstrap value of a node is the number of times it being reconstructed in bootstrap replications. The root node always has bootstrap value of 100 and is excluded.
+
+```         
+bs_value<-cal.bs(partial_tree2,bstrees,ncore=10)
+```
+
+For dataset with more than 100k OTUs, it takes much time to impute missing entries using `iter.impute.packed`. Instead, we provide a faster shell script. It can be found the `scripts/` folder. `-p` specifies the prefix of data. The input file should be named as `<prefix>.csv`. `-n` specifies the initial number of neighbors in imputation. `-b` specifies the batch size. If CasPhy runs out of memory, it should be set to smaller values. `-t` specifies the number of threads. `-c` specifies the running mode. `-c 0` means running from the beginning. If the imputation stops due to some accident but the temporary files are not removed, user can use `-c 1` to continue the imputation. The imputed matrix will be named as `<prefix>_imputed.csv`.
+
+```         
+<PATH TO THE SCRIPTS>/run_impute.sh -p <prefix> -n 10 -b 10000 -t 10 -c 0
+```
+
+Next, we will show how CasPhy reconstructs the phylogeny from binary data (from base-editor-based lineage-tracing data). `to.bit` turns the integer matrix (contain 0 and 1 only) into a bit-coded matrix.
+
+```         
+data(mat_binary)
+matb<-to.bit(mat_binary)
+rownames(matb)<-paste0("C",1:nrow(matb))
+dup_idx<-find.dup(matb,ncore=10)
+matb2<-matb[dup_idx==1:length(dup_idx),]
+attr(matb2,"bit_coded")<-T
+attr(matb2,"nloci")<-ncol(matb2)*32
+```
+
+The top solver and bottom solver have no difference.
+
+```         
+splt<-split.data(matb2,radius=7,p_shared=0.8,min_size=10,ncore=10)
+splt.summerize(splt)
+phys<-h.partial.join(matb2,splt)
+partial_tree<-link.hcluster(phys)
+partial_tree<-order.tip(partial_tree,rownames(matb2))
+partial_tree2<-insert.dup(partial_tree,dup_idx,rownames(matb))
+nEvo<-cal.nevo(partial_tree2,matb)
+
+heatmap(
+  mat_binary+1,
+  Rowv=as.dendrogram(as.hclust.phylo(as.ultrametric(multi2di(partial_tree2)))),
+  Colv=NA,
+  labCol=NA,
+  labRow=NA,
+  cexCol=0.7,
+  scale="none",
+  col=c("white","red")
+)
+```
+
+Weights should be a vector for binary data in bootstrap analysis.
+
+```         
+w<-list()
+set.seed(1)
+for(i in 1:100){
+  w[[i]]<-runif(ncol(matb2)*32)*2
+}
+bstrees<-list()
+for(i in 1:100){
+  splt<-split.data(matb2,weight=w[[i]],radius=7,p_shared=0.8,min_size=10,ncore=10)
+  phys<-h.partial.join(matb2,splt,weight=w[[i]])
+  tmp<-link.hcluster(phys)
+  tmp<-order.tip(tmp,rownames(matb2))
+  bstrees[[i]]<-insert.dup(tmp,dup_idx,rownames(matb))
+}
+bs_value<-cal.bs(partial_tree2,bstrees,ncore=10)
+```
