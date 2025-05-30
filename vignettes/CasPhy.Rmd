@@ -1,11 +1,20 @@
 ---
 title: "CasPhy"
-output: rmarkdown::html_vignette
+author: "Li Lin"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true            # 为 HTML 开启目录
+    toc_float: true      # 浮动目录
+  pdf_document:
+    toc: true            # 为 PDF 开启目录
+    number_sections: true
 vignette: >
   %\VignetteIndexEntry{CasPhy}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
+
 
 CasPhy is a phylogeny reconstruction algorithm for lineage-tracing data. We will show how to use it. `mat1k` contains the mutation profiles of 1000 cells. Each row is an OTU (operational taxonomic unit) and each column is a target site. `-1` is missing data, `0` is un-mutated state and other integers are edited indels. The `rownames` of `mat` must be specified.
 
