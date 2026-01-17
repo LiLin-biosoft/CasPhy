@@ -4,14 +4,14 @@
 \alias{shared.mutation.join}
 \title{phylogeny reconstruction using shared-mutation-join algorithm}
 \usage{
-shared.mutation.join(mat, weight = NULL, noise = F)
+shared.mutation.join(mat, bit_coded = F, weight = NULL)
 }
 \arguments{
 \item{mat}{The mutation matrix.}
 
-\item{weight}{Weights of indels.}
+\item{bit_coded}{Whether the matrix is bit coded.}
 
-\item{noise}{Whether add some noise to the weights to prevent equal number of shared mutations.}
+\item{weight}{Weights of indels.}
 }
 \value{
 a reconstructed phylogeny.

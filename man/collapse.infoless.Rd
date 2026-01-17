@@ -2,14 +2,16 @@
 % Please edit documentation in R/CasPhy_functions.R
 \name{collapse.infoless}
 \alias{collapse.infoless}
-\title{add the length of edges to the phylogeny according the number of evolution events and collapse nodes without evolution.}
+\title{add the length of edges to the phylogeny and collapse nodes without evolution.}
 \usage{
-collapse.infoless(phy, nEvo, collapse = T)
+collapse.infoless(phy, mat, bit_coded = F, collapse = T)
 }
 \arguments{
 \item{phy}{The phylogeny object.}
 
-\item{nEvo}{The results from `cal.nevo`.}
+\item{mat}{The mutation matrix.}
+
+\item{bit_coded}{Whether the matrix is bit coded.}
 
 \item{collapse}{Whether to collapse the nodes. If set to False, the function just add the length of edges to the phylogeny.}
 }
@@ -17,11 +19,11 @@ collapse.infoless(phy, nEvo, collapse = T)
 a phylogeny.
 }
 \description{
-add the length of edges to the phylogeny according the number of evolution events and collapse nodes without evolution.
+add the length of edges to the phylogeny and collapse nodes without evolution.
 }
 \examples{
 \dontrun{
-tre<-collapse.infoless(tre,nEvo)
+tre<-collapse.infoless(tre,mat)
 }
 
 }

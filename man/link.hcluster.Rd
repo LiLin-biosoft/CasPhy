@@ -4,7 +4,7 @@
 \alias{link.hcluster}
 \title{link clusters to a single phylogeny}
 \usage{
-link.hcluster(mg)
+link.hcluster(phys)
 }
 \arguments{
 \item{mg}{List of phylogenies.}
@@ -17,7 +17,7 @@ link clusters to a single phylogeny
 }
 \examples{
 \dontrun{
-tre<-as.ultrametric(phys)
+tre<-link.hcluster(phys)
 }
 
 }

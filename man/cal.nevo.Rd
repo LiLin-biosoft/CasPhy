@@ -4,16 +4,14 @@
 \alias{cal.nevo}
 \title{calculate the number of evolution events of the phylogeny.}
 \usage{
-cal.nevo(phy, mat, weight = NULL, verbose = T)
+cal.nevo(phy, mat, bit_coded = F)
 }
 \arguments{
 \item{phy}{The phylogeny object.}
 
 \item{mat}{The mutation matrix.}
 
-\item{weight}{Weights of indels.}
-
-\item{verbose}{Whether to print the number of evolution events.}
+\item{bit_coded}{Whether the matrix is bit coded.}
 }
 \value{
 an bit-coded matrix marking the evolution events in the nodes of the phylogeny.

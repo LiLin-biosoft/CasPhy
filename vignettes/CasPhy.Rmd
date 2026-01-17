@@ -15,13 +15,13 @@ vignette: >
   %\VignetteEncoding{UTF-8}
 ---
 
+## Example of small size CRISPR-Cas9 lineage-tracing data
 
-CasPhy is a phylogeny reconstruction algorithm for lineage-tracing data. We will show how to use it. `mat1k` contains the mutation profiles of 1000 cells. Each row is an OTU (operational taxonomic unit) and each column is a target site. `-1` is missing data, `0` is un-mutated state and other integers are edited indels. The `rownames` of `mat` must be specified.
+`mat1k` contains the mutation profiles of 1000 cells. Each row is an OTU (operational taxonomic unit) and each column is a editable site. `-1` is missing data, `0` is un-mutated state and other integers are edited indels. The `rownames` of `mat` must be specified.
 
 ```         
 suppressMessages(library(CasPhy))
 suppressMessages(library(RColorBrewer))
-
 data(mat1k)
 mat<-mat1k
 for(i in 1:ncol(mat)){
@@ -39,26 +39,20 @@ dup_idx<-find.dup(imputed)
 imputed<-imputed[dup_idx==1:length(dup_idx),]
 ```
 
-For small dataset, we can use the bottom solver `shared.mutation.join` to reconstruct the phylogeny and insert duplicated OTUs back to the phylogeny by `insert.dup`. The parsimony of the phylogeny can be calculated using `cal.nevo`.
+We use `shared.mutation.join` to directly build the phylogeny and insert duplicated OTUs back to the phylogeny by `insert.dup`. `collapse.infoless` add branch length according to the number of mutations and collapse branches without mutation.
 
 ```         
 smj_tree<-shared.mutation.join(imputed)
-smj_tree2<-insert.dup(smj_tree,dup_idx,label=rownames(mat))
-nEvo<-cal.nevo(smj_tree2,mat)
+smj_tree<-insert.dup(smj_tree,dup_idx,label=rownames(mat))
+smj_tree<-collapse.infoless(smj_tree,mat)
 ```
 
-Optionally, we can add the length of edges to the phylogeny according to the number of mutation events along the edge and then collapse edges without mutation events.
-
-```         
-smj_tree2<-collapse.infoless(smj_tree2,nEvo)
-```
-
-The heatmap can be used to see whether the phylogeny explains the data well.
+Use `heatmap` to see the results.
 
 ```         
 heatmap(
   mat+2,
-  Rowv=as.dendrogram(as.hclust.phylo(as.ultrametric(multi2di(smj_tree2)))),
+  Rowv=as.dendrogram(as.hclust.phylo(as.ultrametric(multi2di(smj_tree)))),
   Colv=NA,
   labCol=1:ncol(mat),
   labRow=NA,
@@ -75,7 +69,9 @@ heatmap(
 )
 ```
 
-Next, we will show how to reconstruct the phylogeny of a larger dataset. We use `ncore` to specify the number of threads used (not available on Windows system).
+## Example of large data
+
+First impute data and remove duplicates.
 
 ```         
 data(mat10k)
@@ -90,25 +86,31 @@ dup_idx<-find.dup(imputed,ncore=10)
 imputed<-imputed[dup_idx==1:length(dup_idx),]
 ```
 
-We use the top solver `split.data` to split the data into small clusters. `radius` means the minimum number of common mutations between neighbors. `p_shared` is the threshold used to break weakly connected OTUs. `radius` and `p_shared` can be used to adjust the sizes of clusters. `splt.summerize` is used to calculate the number of OTUs in each cluster.
+Large dataset should be first split into clusters for parallel computing. Parallel computing can only run on linux system. We use `split.data` to split the data into small clusters. `radius` is the minimum number of common mutations between neighbors. `p_shared` is the threshold used to break weakly connected OTUs. `radius` and `p_shared` can be used to adjust the sizes of clusters. `ncore` is the number of CPU cores. `splt.summerize` is used to calculate the number of OTUs in resulting clusters. To use GPU acceleration, set `cuda_path` to the path of cuda scripts. Use `file_backed` to specify the prefix of temporary backing file.
 
 ```         
-splt<-split.data(imputed,radius=8,p_shared=0.8,ncore=10)
+splt<-split.data(imputed,radius=8,p_shared=0.8,ncore=10) ##do not use GPU
+splt<-split.data(imputed,radius=8,p_shared=0.8,ncore=10,file_backed="mat10k",cuda_path="~/CasPhy-cuda/build/") ##use GPU
 head(splt.summerize(splt),n=20)
 ```
 
-We use `h.partial.join` to reconstruct the phylogeny of each cluster and use `link.hcluster` to link all phylogenies together. Finally, we use `order.tip` to re-order the tip of the phylogeny to match the rownames of `imputed`.
+We use `h.partial.join` to reconstruct the phylogeny of each cluster and use `link.hcluster` to link all phylogenies together. Finally, we use `order.tip` to re-order the tip of the phylogeny to match the rownames of `imputed`. `prefix` is the prefix of temporary file. If `cuda_path` is specified, phylogenetic reconstruction of large clusters (\> `cuda_threshold`) will run on GPU.
 
 ```         
-partial_phys<-h.partial.join(imputed,splt)
-partial_tree<-link.hcluster(partial_phys)
-partial_tree<-order.tip(partial_tree,rownames(imputed))
-partial_tree2<-insert.dup(partial_tree,dup_idx,label=rownames(mat))
+partial_phys<-h.partial.join(imputed,splt,ncore=10) ## do not use GPU
+partial_phys<-h.partial.join(imputed,splt,ncore=10,prefix="mat10k",cuda_path="~/CasPhy/",cuda_threshold=100) use GPU
+final_tree<-link.hcluster(partial_phys)
+final_tree<-order.tip(final_tree,rownames(imputed))
+final_tree<-insert.dup(final_tree,dup_idx,label=rownames(mat))
+final_tree<-collapse.infoless(final_tree,mat)
+```
 
-nEvo<-cal.nevo(partial_tree2,mat)
+Use `heatmap` to see the results. The data contains cells from multiple clones.
+
+```         
 heatmap(
   mat+2,
-  Rowv=as.dendrogram(as.hclust.phylo(as.ultrametric(multi2di(partial_tree2)))),
+  Rowv=as.dendrogram(as.hclust.phylo(as.ultrametric(multi2di(final_tree)))),
   Colv=NA,
   labCol=1:ncol(mat),
   labRow=NA,
@@ -125,7 +127,9 @@ heatmap(
 )
 ```
 
-Next, we will show how to infer the clade support of the phylogeny using bootstrap analysis. Bootstrap analysis starts with the imputed matrix. We randomly generate weights for indels from a uniform distribution. Weights is specified by a matrix. Each row is an indel and each column is a target site.
+## Bootstrap on CRISPR-Cas9 data
+
+We perform bootstrap analysis by assigning random weights to editable sites. Weights is a matrix, where column is editable site and row is indel.
 
 ```         
 nIndel<-max(apply(imputed,2,function(x){
@@ -133,62 +137,47 @@ nIndel<-max(apply(imputed,2,function(x){
 }))
 w<-list()
 set.seed(1)
-for(i in 1:100){
-  w[[i]]<-matrix(runif(nIndel*ncol(imputed))*2,nIndel,ncol(imputed))
+for(i in 1:10){
+  w[[i]]<-matrix(runif(nIndel*ncol(imputed)),nIndel,ncol(imputed))+0.5
 }
-```
 
-Then, we perform bootstrap analysis. We use `h.partial.join.parallel` instead of `h.partial.join`. This is a parallel version of the bottom solver and is more efficient than `h.partial.join` when there are many clusters. The script below runs bootstrap analysis using 10 threads.
-
-```         
 bstrees<-list()
-for(i in 1:100){
-  splt<-split.data(mat=imputed,weight=w[[i]],radius=8,p_shared=0.8,ncore=10)
-  phys<-h.partial.join.parallel(mat=imputed,splt=splt,weight=w[[i]],ncore=10)
+for(i in 1:10){
+  splt<-split.data(mat=imputed,weight=w[[i]],radius=8,p_shared=0.8,ncore=10,file_backed="mat10k",cuda_path="~/CasPhy-cuda/build/")
+  phys<-h.partial.join(mat=imputed,splt=splt,weight=w[[i]],ncore=10,prefix="mat10k",cuda_path="~/CasPhy-cuda/build/",cuda_threshold=100)
   tmp<-link.hcluster(phys)
   tmp<-order.tip(tmp,rownames(imputed))
-  bstrees[[i]]<-insert.dup(tmp,dup_idx,label=rownames(mat))
+  tmp<-insert.dup(tmp,dup_idx,label=rownames(mat))
+  bstrees[[i]]<-tmp
 }
 ```
 
-Finally, we calculate the bootstrap values for each node. Bootstrap value of a node is the number of times it being reconstructed in bootstrap replications. The root node always has bootstrap value of 100 and is excluded.
+## Example of base-editor lineage-tracing data
 
-```         
-bs_value<-cal.bs(partial_tree2,bstrees,ncore=10)
-```
-
-For dataset with more than 100k OTUs, it takes much time to impute missing entries using `iter.impute.packed`. Instead, we provide a faster shell script. It can be found the `scripts/` folder. `-p` specifies the prefix of data. The input file should be named as `<prefix>.csv`. `-n` specifies the initial number of neighbors in imputation. `-b` specifies the batch size. If CasPhy runs out of memory, it should be set to smaller values. `-t` specifies the number of threads. `-c` specifies the running mode. `-c 0` means running from the beginning. If the imputation stops due to some accident but the temporary files are not removed, user can use `-c 1` to continue the imputation. The imputed matrix will be named as `<prefix>_imputed.csv`.
-
-```         
-<PATH TO THE SCRIPTS>/run_impute.sh -p <prefix> -n 10 -b 10000 -t 10 -c 0
-```
-
-Next, we will show how CasPhy reconstructs the phylogeny from binary data (from base-editor-based lineage-tracing data). `to.bit` turns the integer matrix (contain 0 and 1 only) into a bit-coded matrix.
+There are only two states in base-editor lineage-tracing data (unedited and edited). We use one bit to code the state of one editable site by `to.bit`. Each integer contains the states of 32 editable sites. For binary data, set `bit_coded=T`.
 
 ```         
 data(mat_binary)
 matb<-to.bit(mat_binary)
 rownames(matb)<-paste0("C",1:nrow(matb))
-dup_idx<-find.dup(matb,ncore=10)
+dup_idx<-find.dup(matb,bit_coded=T,ncore=10)
 matb2<-matb[dup_idx==1:length(dup_idx),]
-attr(matb2,"bit_coded")<-T
-attr(matb2,"nloci")<-ncol(matb2)*32
 ```
 
-The top solver and bottom solver have no difference.
+Run phylogenetic reconstruction.
 
 ```         
-splt<-split.data(matb2,radius=7,p_shared=0.8,min_size=10,ncore=10)
+splt<-split.data(matb2,bit_coded=T,radius=7,p_shared=0.8,ncore=10,file_backed="mat_binary",cuda_path="~/CasPhy-cuda/build/")
 splt.summerize(splt)
-phys<-h.partial.join(matb2,splt)
-partial_tree<-link.hcluster(phys)
-partial_tree<-order.tip(partial_tree,rownames(matb2))
-partial_tree2<-insert.dup(partial_tree,dup_idx,rownames(matb))
-nEvo<-cal.nevo(partial_tree2,matb)
+phys<-h.partial.join(matb2,splt=splt,bit_coded=T,ncore=10,prefix="mat_binary",cuda_path="~/CasPhy-cuda/build/",cuda_threshold=100)
+final_tree<-link.hcluster(phys)
+final_tree<-order.tip(final_tree,rownames(matb2))
+final_tree<-insert.dup(final_tree,dup_idx,rownames(matb))
+final_tree<-collapse.infoless(final_tree,matb,bit_coded=T)
 
 heatmap(
   mat_binary+1,
-  Rowv=as.dendrogram(as.hclust.phylo(as.ultrametric(multi2di(partial_tree2)))),
+  Rowv=as.dendrogram(as.hclust.phylo(as.ultrametric(multi2di(final_tree)))),
   Colv=NA,
   labCol=NA,
   labRow=NA,
@@ -198,21 +187,177 @@ heatmap(
 )
 ```
 
-Weights should be a vector for binary data in bootstrap analysis.
+## Bootstrap on base-editor data
+
+Weights is a vector for binary data.
 
 ```         
 w<-list()
 set.seed(1)
-for(i in 1:100){
-  w[[i]]<-runif(ncol(matb2)*32)*2
+for(i in 1:10){
+  w[[i]]<-runif(ncol(matb2)*32)+0.5
 }
 bstrees<-list()
-for(i in 1:100){
-  splt<-split.data(matb2,weight=w[[i]],radius=7,p_shared=0.8,min_size=10,ncore=10)
-  phys<-h.partial.join(matb2,splt,weight=w[[i]])
+for(i in 1:10){
+  splt<-split.data(matb2,bit_coded=T,weight=w[[i]],radius=7,p_shared=0.8,ncore=10,file_backed="mat_binary",cuda_path="~/CasPhy/")
+  phys<-h.partial.join(matb2,splt,bit_coded=T,weight=w[[i]],ncore=10,prefix="mat_binary",cuda_path="~/CasPhy/",cuda_threshold=100)
   tmp<-link.hcluster(phys)
   tmp<-order.tip(tmp,rownames(matb2))
   bstrees[[i]]<-insert.dup(tmp,dup_idx,rownames(matb))
 }
-bs_value<-cal.bs(partial_tree2,bstrees,ncore=10)
+```
+
+## Example of DNA sequence data
+
+First, use `fasta2bin` in linux shell to transform fasta file to bin file. The source code of `fasta2bin` and example data can be found in the repository of cuda script.
+
+```         
+~/CasPhy-cuda/build/fasta2bin test.fasta test.bin test_names.txt test_positions.txt
+```
+
+Then, read the bin file. For DNA sequence data, each column is an OTU.
+
+```         
+mat<-read.bin2mat("test.bin")
+```
+
+Use `split.data.DNA` to split the data. Both `split.data` and `split.data.DNA` can be called on result from previous run to further split one cluster into smaller ones. `splt` is the result from previous run. `splt_idx` is the index of cluster you want to split.
+
+```         
+splt<-cbind(rep(1,ncol(mat)),0)
+splt<-split.data.DNA(
+  mat=mat,splt=splt,splt_idx=1,
+  radius=1300,p_shared=0.8,
+  file_backed="test__M1",
+  cuda_path="~/CasPhy-cuda/build/",verbose=T
+)
+```
+
+We further split cluster 2 from the previous run. The result now contains three layers.
+
+```         
+splt<-split.data.DNA(
+  mat=mat,splt=splt,splt_idx=2,
+  radius=1400,p_shared=0.8,
+  file_backed="test__M2",
+  cuda_path="~/CasPhy/",verbose=T
+)
+head(splt.summerize(splt))
+tail(splt.summerize(splt))
+```
+
+To reduce the memory usage in parallel computing, the matrix should be a big memory object.
+
+```         
+mat<-read.bin2bigmat("test.bin")
+mat_desc<-describe(mat)
+tipname<-paste0("C",1:ncol(mat))
+```
+
+Build the phylogeny for all clusters in layer 3 using `partial.join.DNA`. We perform parallel computing with 4 threads. `mat_desc` is the descriptor object of matrix. `tipname` is the sequence name. There must be two copies of the matrix. `matfile` is the filename of the other copy in hard disk.
+
+```         
+splt<-cbind(splt,0)
+layer<-3
+clustIdx<-setdiff(sort(unique(splt[,layer])),0)
+partial_res_collected<-list()
+nProcessed<-0
+while(nProcessed<length(clustIdx)){
+  cl<-makeForkCluster(4)
+  tmp_res<-parLapply(cl,clustIdx[(nProcessed+1):min((nProcessed+4),length(clustIdx))],partial.join.DNA,
+                     mat_desc=mat_desc,
+                     tipname=tipname,
+                     matfile="test.bin",
+                     ansMat_desc=NULL,
+                     nodename=NULL,
+                     splt=splt,
+                     layer=layer,
+                     prefix="test",
+                     cuda_path="~/CasPhy-cuda/build/")
+  stopCluster(cl)
+  partial_res_collected<-c(partial_res_collected,tmp_res)
+  nProcessed<-nProcessed+4
+}
+```
+
+Use `layer.summarize` to summarize the results. We have some pseudo-OTUs from layer 3. Their mutation profiles are stored in `ansMat`. `splt` is also updated. `phys` contains the phylogenies within pseudo-OTUs.
+
+```         
+res_summarized<-layer.summarize(partial_res_collected,clustIdx,splt,layer)
+phys<-res_summarized$phys
+tmp<-res_summarized$ansMat
+nodename<-colnames(res_summarized$ansMat)
+ansMat<-as.big.matrix(tmp)
+ansMat_desc<-describe(ansMat)
+splt<-res_summarized$splt
+```
+
+Next, we build the phylogeny for all clusters in layer 2. `ansMat_desc` is the descriptor file of pseudo-OTU matrix. `nodename` is the name of pseudo-OTUs.
+
+```         
+layer<-2
+clustIdx<-setdiff(sort(unique(splt[,layer])),0)
+partial_res_collected<-list()
+nProcessed<-0
+while(nProcessed<length(clustIdx)){
+  cl<-makeForkCluster(4)
+  tmp_res<-parLapply(cl,clustIdx[(nProcessed+1):min((nProcessed+4),length(clustIdx))],partial.join.DNA,
+                     mat_desc=mat_desc,
+                     tipname=tipname,
+                     matfile="test.bin",
+                     ansMat_desc=ansMat_desc,
+                     nodename=nodename,
+                     splt=splt,
+                     layer=layer,
+                     prefix="test",
+                     cuda_path="~/CasPhy-cuda/build/")
+  stopCluster(cl)
+  partial_res_collected<-c(partial_res_collected,tmp_res)
+  nProcessed<-nProcessed+4
+}
+  
+res_summarized<-layer.summarize(partial_res_collected,clustIdx,splt,layer)
+phys<-c(phys,res_summarized$phys)
+tmp<-cbind(as.matrix(ansMat),res_summarized$ansMat)
+nodename<-c(nodename,colnames(res_summarized$ansMat))
+ansMat<-as.big.matrix(tmp)
+ansMat_desc<-describe(ansMat)
+rm(tmp)
+splt<-res_summarized$splt
+```
+
+Next, we build the phylogeny for layer 1.
+
+```         
+layer<-1
+clustIdx<-setdiff(sort(unique(splt[,layer])),0)
+partial_res_collected<-list()
+partial_res_collected[[1]]<-partial.join.DNA(clustIdx,
+                   mat_desc=mat_desc,
+                   tipname=tipname,
+                   matfile="test.bin",
+                   ansMat_desc=ansMat_desc,
+                   nodename=nodename,
+                   splt=splt,
+                   layer=layer,
+                   prefix="test",
+                   cuda_path="~/CasPhy-cuda/build/")
+res_summarized<-layer.summarize(partial_res_collected,clustIdx,splt,layer)
+phys<-c(phys,res_summarized$phys)
+```
+
+Finally, we link all phylogenies together to build the final tree.
+
+```         
+final_tree<-link.hcluster(phys)
+final_tree<-order.tip(final_tree,tipname)
+seqname<-as.character(read.table(file="test_names.txt",header=T,sep=",")[,1])
+final_tree$tip.label<-seqname
+```
+
+We can calculate the Robison-Foulds distance between the reconstructed and the true phylogenies by package `phangorn`.
+
+```         
+truth_tree<-read.tree(file="test_truth.tre")
+phangorn::RF.dist(truth_tree,final_tree,normalize=T,check.labels=T,rooted=F)
 ```

@@ -7,11 +7,14 @@
 h.partial.join(
   mat,
   splt,
+  bit_coded = F,
   keep_cutoff = 1,
   weight = NULL,
-  noise = F,
-  bk_size = 40000,
-  verbose = F
+  prefix = "./",
+  cuda_path = NULL,
+  cuda_threshold = 500,
+  ncore = 1,
+  verbose = T
 )
 }
 \arguments{
@@ -19,13 +22,19 @@ h.partial.join(
 
 \item{splt}{Split of data from `split.data`.}
 
+\item{bit_coded}{Whether the matrix is bit coded.}
+
 \item{keep_cutoff}{The cutoff to break problematic clades.}
 
 \item{weight}{Weights of indels.}
 
-\item{noise}{Whether add some noise to the weights to prevent equal number of shared mutations.}
+\item{prefix}{The prefix of temporary file.}
 
-\item{bk_size}{If the number of OTUs is larger than this value, the function will create a backup file to save memory.}
+\item{cuda_path}{The path of CUDA script. If set to `NULL`, do not use CUDA.}
+
+\item{cuda_threshold}{Cluster larger than this value will be accelerated by CUDA.}
+
+\item{ncore}{The number of cores used.}
 
 \item{verbose}{Whether print detailed information.}
 }

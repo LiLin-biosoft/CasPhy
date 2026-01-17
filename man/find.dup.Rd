@@ -4,7 +4,7 @@
 \alias{find.dup}
 \title{find duplicated OTUs in the mutation matrix.}
 \usage{
-find.dup(mat, ncore = 1)
+find.dup(mat, bit_coded = F, ncore = 1)
 }
 \arguments{
 \item{mat}{The mutation matrix.}

@@ -129,8 +129,8 @@ nodeDes <- function(edge, nnode, ntip) {
     .Call(`_CasPhy_nodeDes`, edge, nnode, ntip)
 }
 
-nodeDesBig <- function(edge, nnode, ntip, file_path, cacheSize = 8192L) {
-    invisible(.Call(`_CasPhy_nodeDesBig`, edge, nnode, ntip, file_path, cacheSize))
+nodeDesBig <- function(edge, nnode, ntip, file_path, cacheSize = 8192L, header = TRUE) {
+    .Call(`_CasPhy_nodeDesBig`, edge, nnode, ntip, file_path, cacheSize, header)
 }
 
 findNeighborRangeUnweighted <- function(i, mat, maxChar, range, offset, n = 10L, p = 0.5, radius = 0L) {
@@ -159,5 +159,181 @@ radiusUnweightedParallel <- function(i, mat, maxChar, radius) {
 
 radiusWeightedParallel <- function(i, mat, maxChar, weight, radius) {
     .Call(`_CasPhy_radiusWeightedParallel`, i, mat, maxChar, weight, radius)
+}
+
+bsCollapse <- function(edge, edgeLen, bs, threshold = 50) {
+    .Call(`_CasPhy_bsCollapse`, edge, edgeLen, bs, threshold)
+}
+
+greedyJoinEdge2 <- function(mat, weight, tipSize, minSize = 0L, minRatio = 2.0, verbose = FALSE) {
+    .Call(`_CasPhy_greedyJoinEdge2`, mat, weight, tipSize, minSize, minRatio, verbose)
+}
+
+greedyJoinEdgeBit2 <- function(mat, weight, tipSize, minSize = 0L, minRatio = 2.0, verbose = FALSE) {
+    .Call(`_CasPhy_greedyJoinEdgeBit2`, mat, weight, tipSize, minSize, minRatio, verbose)
+}
+
+reOrderEdge2 <- function(edge, root) {
+    .Call(`_CasPhy_reOrderEdge2`, edge, root)
+}
+
+outmatFilterBit <- function(mat, state, cutoff = 1L) {
+    .Call(`_CasPhy_outmatFilterBit`, mat, state, cutoff)
+}
+
+nodeFilterBit <- function(mat, state, cutoff = 1L) {
+    .Call(`_CasPhy_nodeFilterBit`, mat, state, cutoff)
+}
+
+nodeKeepBit2 <- function(edge, Ntip, node_mat, outmat, keep_cutoff) {
+    .Call(`_CasPhy_nodeKeepBit2`, edge, Ntip, node_mat, outmat, keep_cutoff)
+}
+
+outmatFilterIndel <- function(mat, state, cutoff = 1L) {
+    .Call(`_CasPhy_outmatFilterIndel`, mat, state, cutoff)
+}
+
+nodeFilterIndel <- function(mat, state, cutoff = 1L) {
+    .Call(`_CasPhy_nodeFilterIndel`, mat, state, cutoff)
+}
+
+nodeKeepIndel <- function(edge, Ntip, node_mat, outmat, keep_cutoff) {
+    .Call(`_CasPhy_nodeKeepIndel`, edge, Ntip, node_mat, outmat, keep_cutoff)
+}
+
+edgeSplit <- function(edge, node) {
+    .Call(`_CasPhy_edgeSplit`, edge, node)
+}
+
+tipMergeCross <- function(pNeighborMat, offset1, offset2, len, nNeighbor, member, transition, p = 0.8, sqrt_nNeighbor = FALSE, min_shared = 0L) {
+    .Call(`_CasPhy_tipMergeCross`, pNeighborMat, offset1, offset2, len, nNeighbor, member, transition, p, sqrt_nNeighbor, min_shared)
+}
+
+tipMergeSub <- function(pNeighborMat, offset, len, nNeighbor, p = 0.8, sqrt_nNeighbor = FALSE, min_shared = 0L) {
+    .Call(`_CasPhy_tipMergeSub`, pNeighborMat, offset, len, nNeighbor, p, sqrt_nNeighbor, min_shared)
+}
+
+combineTransition <- function(transition1, transition2) {
+    .Call(`_CasPhy_combineTransition`, transition1, transition2)
+}
+
+outmatFilterBit2 <- function(mat, rowIdx, state, cutoff = 1L) {
+    .Call(`_CasPhy_outmatFilterBit2`, mat, rowIdx, state, cutoff)
+}
+
+outmatFilterIndel2 <- function(mat, rowIdx, state, cutoff = 1L) {
+    .Call(`_CasPhy_outmatFilterIndel2`, mat, rowIdx, state, cutoff)
+}
+
+selectedNodeDes <- function(edge, nnode, ntip, node, cacheSize = 8192L) {
+    .Call(`_CasPhy_selectedNodeDes`, edge, nnode, ntip, node, cacheSize)
+}
+
+bitAncestralEC <- function(mat, edge, tipSize, nnode, minSize = 10, minRatio = 2) {
+    .Call(`_CasPhy_bitAncestralEC`, mat, edge, tipSize, nnode, minSize, minRatio)
+}
+
+charAncestralEC <- function(mat, edge, tipSize, nnode, minSize = 10, minRatio = 2) {
+    .Call(`_CasPhy_charAncestralEC`, mat, edge, tipSize, nnode, minSize, minRatio)
+}
+
+calPseudoSize <- function(tipSize, tip2pseudo, nPseudo) {
+    .Call(`_CasPhy_calPseudoSize`, tipSize, tip2pseudo, nPseudo)
+}
+
+calcAncestralBitReverse <- function(seq1, bistate1, seq2, bistate2) {
+    .Call(`_CasPhy_calcAncestralBitReverse`, seq1, bistate1, seq2, bistate2)
+}
+
+calcAncestralBitReverse2 <- function(seq1, bistate1, seq2, bistate2) {
+    .Call(`_CasPhy_calcAncestralBitReverse2`, seq1, bistate1, seq2, bistate2)
+}
+
+greedyJoinEdgeBitReverse <- function(mat, weight, verbose = FALSE, ancestralType = 0L) {
+    .Call(`_CasPhy_greedyJoinEdgeBitReverse`, mat, weight, verbose, ancestralType)
+}
+
+calcDesStateBitReverse <- function(seq1, seq2, bistate2) {
+    .Call(`_CasPhy_calcDesStateBitReverse`, seq1, seq2, bistate2)
+}
+
+ancestralBitReverse <- function(mat, edge, ntip, nnode) {
+    .Call(`_CasPhy_ancestralBitReverse`, mat, edge, ntip, nnode)
+}
+
+encodeATGC8 <- function(s) {
+    .Call(`_CasPhy_encodeATGC8`, s)
+}
+
+decodeATGC8 <- function(encoded, randomize_ambiguous = FALSE) {
+    .Call(`_CasPhy_decodeATGC8`, encoded, randomize_ambiguous)
+}
+
+countATCG <- function(s) {
+    .Call(`_CasPhy_countATCG`, s)
+}
+
+calcAncestorState <- function(seq1, seq2) {
+    .Call(`_CasPhy_calcAncestorState`, seq1, seq2)
+}
+
+seqSimilarity <- function(seq1, seq2, weight) {
+    .Call(`_CasPhy_seqSimilarity`, seq1, seq2, weight)
+}
+
+greedyJoinEdgeDNA <- function(mat, weight, verbose = FALSE) {
+    .Call(`_CasPhy_greedyJoinEdgeDNA`, mat, weight, verbose)
+}
+
+calcDesState <- function(seq1, seq2) {
+    .Call(`_CasPhy_calcDesState`, seq1, seq2)
+}
+
+nucleoAncestral <- function(mat, edge, ntip, nnode) {
+    .Call(`_CasPhy_nucleoAncestral`, mat, edge, ntip, nnode)
+}
+
+radiusWeightedDNAParallel <- function(i, mat, weight, radius) {
+    .Call(`_CasPhy_radiusWeightedDNAParallel`, i, mat, weight, radius)
+}
+
+outmatFilterDNA <- function(mat, colIdx, state, cutoff = 1L) {
+    .Call(`_CasPhy_outmatFilterDNA`, mat, colIdx, state, cutoff)
+}
+
+nodeFilterDNA <- function(mat, state, cutoff = 1L) {
+    .Call(`_CasPhy_nodeFilterDNA`, mat, state, cutoff)
+}
+
+nodeKeepDNA <- function(edge, ntip, node_mat, outmat, keep_cutoff) {
+    .Call(`_CasPhy_nodeKeepDNA`, edge, ntip, node_mat, outmat, keep_cutoff)
+}
+
+findRoot <- function(edge, nodeState, mat, outIdx) {
+    .Call(`_CasPhy_findRoot`, edge, nodeState, mat, outIdx)
+}
+
+findRootAVX2 <- function(edge, nodeState, mat, outIdx) {
+    .Call(`_CasPhy_findRootAVX2`, edge, nodeState, mat, outIdx)
+}
+
+findRootAVX2Big <- function(edge, nodeState, matSEXP, outIdx) {
+    .Call(`_CasPhy_findRootAVX2Big`, edge, nodeState, matSEXP, outIdx)
+}
+
+breakUnrootedPhy <- function(edge, ntip, nnode, breakNode) {
+    .Call(`_CasPhy_breakUnrootedPhy`, edge, ntip, nnode, breakNode)
+}
+
+getEdgeState <- function(edge, nodeState, outmat) {
+    .Call(`_CasPhy_getEdgeState`, edge, nodeState, outmat)
+}
+
+locusOR <- function(ve1, ve2) {
+    .Call(`_CasPhy_locusOR`, ve1, ve2)
+}
+
+zipMat <- function(ve) {
+    .Call(`_CasPhy_zipMat`, ve)
 }
 
