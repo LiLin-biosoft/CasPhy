@@ -30,4 +30,4 @@ cd build
 cmake -DCUDA_ARCH=89 .. ## set compute capacity to 89 for RTX 40 series
 make
 ```
-To perform phylogenetic reconstruction, VeryFastTree is required(<https://github.com/citiususc/veryfasttree>).
+To perform phylogenetic reconstruction on DNA sequences, VeryFastTree is required(<https://github.com/citiususc/veryfasttree>).
