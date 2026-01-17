@@ -2,7 +2,7 @@
 
 Li Lin<br>
 
-CasPhy is a phylogeny reconstruction algorithm for lineage-tracing data. It can be installed from Github:<br>
+CasPhy is an ultrafast phylogenetic reconstruction algorithm. It can be installed from Github:<br>
 
 ```         
 install.packages('devtools')  
