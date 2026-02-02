@@ -2089,10 +2089,8 @@ split.data.DNA<-function(mat,splt=NULL,splt_idx=1,
                          radius=100,p_shared=0.8,min_size=10,
                          file_backed=NULL,ncore=1,cuda_path=NULL,verbose=F){
   batch_size=1e4
-  if(is.null(weight)){
-    weight<-rep(1,nrow(mat)*4)
-  }
-  
+  weight<-rep(1,nrow(mat)*4)
+
   if(is.null(splt)){
     layer<-1
     k<-1
