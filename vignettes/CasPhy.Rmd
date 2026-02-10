@@ -86,7 +86,8 @@ dup_idx<-find.dup(imputed,ncore=10)
 imputed<-imputed[dup_idx==1:length(dup_idx),]
 ```
 
-Large dataset should be first split into clusters for parallel computing. Parallel computing can only run on linux system. We use `split.data` to split the data into small clusters. `radius` is the minimum number of common mutations between neighbors. `p_shared` is the threshold used to break weakly connected OTUs. `radius` and `p_shared` can be used to adjust the sizes of clusters. `ncore` is the number of CPU cores. `splt.summerize` is used to calculate the number of OTUs in resulting clusters. To use GPU acceleration, set `cuda_path` to the path of cuda scripts. Use `file_backed` to specify the prefix of temporary backing file.
+Large dataset should be first split into clusters for parallel computing. Parallel computing can only run on linux system. We use `split.data` to split the data into small clusters. `radius` is the minimum number of common mutations between neighbors. `p_shared` is the threshold used to break weakly connected OTUs. `ncore` is the number of CPU cores. `splt.summerize` is used to calculate the number of OTUs in resulting clusters. To use GPU acceleration, set `cuda_path` to the path of cuda scripts. Use `file_backed` to specify the prefix of temporary backing file.
+The value of `radius` depends on many factors including the number of editable sites, mutation rates and the topology. It should be manually adjusted to fit the scalability of downstream phylogenetic tools. Larger value results in more clusters with smaller size and smaller values results in fewer clusters with larger size.
 
 ```         
 splt<-split.data(imputed,radius=8,p_shared=0.8,ncore=10) ##do not use GPU
@@ -254,7 +255,8 @@ mat_desc<-describe(mat)
 tipname<-paste0("C",1:ncol(mat))
 ```
 
-Build the phylogeny for all clusters in layer 3 using `partial.join.DNA`. We perform parallel computing with 4 threads. `mat_desc` is the descriptor object of matrix. `tipname` is the sequence name. There must be two copies of the matrix. `matfile` is the filename of the other copy in hard disk.
+Build the phylogeny for all clusters in layer 3 using `partial.join.DNA`. We perform parallel computing with 4 threads. The maximum number of threads depends on the number of CPU cores and the total RAM of your computer. `mat_desc` is the descriptor object of matrix. `tipname` is the sequence name. There must be two copies of the matrix. `matfile` is the filename of the other copy in hard disk.
+
 
 ```         
 splt<-cbind(splt,0)
