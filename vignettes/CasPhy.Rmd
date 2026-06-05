@@ -200,8 +200,8 @@ for(i in 1:10){
 }
 bstrees<-list()
 for(i in 1:10){
-  splt<-split.data(matb2,bit_coded=T,weight=w[[i]],radius=7,p_shared=0.8,ncore=10,file_backed="mat_binary",cuda_path="~/CasPhy/")
-  phys<-h.partial.join(matb2,splt,bit_coded=T,weight=w[[i]],ncore=10,prefix="mat_binary",cuda_path="~/CasPhy/",cuda_threshold=100)
+  splt<-split.data(matb2,bit_coded=T,weight=w[[i]],radius=7,p_shared=0.8,ncore=10,file_backed="mat_binary",cuda_path="~/CasPhy-cuda/build/")
+  phys<-h.partial.join(matb2,splt,bit_coded=T,weight=w[[i]],ncore=10,prefix="mat_binary",cuda_path="~/CasPhy-cuda/build/",cuda_threshold=100)
   tmp<-link.hcluster(phys)
   tmp<-order.tip(tmp,rownames(matb2))
   bstrees[[i]]<-insert.dup(tmp,dup_idx,rownames(matb))
@@ -241,7 +241,7 @@ splt<-split.data.DNA(
   mat=mat,splt=splt,splt_idx=2,
   radius=1400,p_shared=0.8,
   file_backed="test__M2",
-  cuda_path="~/CasPhy/",verbose=T
+  cuda_path="~/CasPhy-cuda/build/",verbose=T
 )
 head(splt.summerize(splt))
 tail(splt.summerize(splt))
@@ -357,7 +357,7 @@ seqname<-as.character(read.table(file="test_names.txt",header=T,sep=",")[,1])
 final_tree$tip.label<-seqname
 ```
 
-We can calculate the Robison-Foulds distance between the reconstructed and the true phylogenies by package `phangorn`.
+We can calculate the Robison-Foulds distance between the reconstructed and the true phylogenies by package `phangorn`. The true phylogeny can be found in the repository of cuda script.
 
 ```         
 truth_tree<-read.tree(file="test_truth.tre")
