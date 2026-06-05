@@ -1,4 +1,4 @@
----
+﻿---
 title: "CasPhy"
 author: "Li Lin"
 date: "`r Sys.Date()`"
@@ -99,7 +99,7 @@ We use `h.partial.join` to reconstruct the phylogeny of each cluster and use `li
 
 ```         
 partial_phys<-h.partial.join(imputed,splt,ncore=10) ## do not use GPU
-partial_phys<-h.partial.join(imputed,splt,ncore=10,prefix="mat10k",cuda_path="~/CasPhy/",cuda_threshold=100) use GPU
+partial_phys<-h.partial.join(imputed,splt,ncore=10,prefix="mat10k",cuda_path="~/CasPhy-cuda/build/",cuda_threshold=100) ##use GPU
 final_tree<-link.hcluster(partial_phys)
 final_tree<-order.tip(final_tree,rownames(imputed))
 final_tree<-insert.dup(final_tree,dup_idx,label=rownames(mat))
