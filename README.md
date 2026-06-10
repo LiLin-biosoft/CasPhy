@@ -7,7 +7,7 @@ CasPhy is an ultrafast phylogenetic reconstruction algorithm. It can be installe
 ```         
 install.packages('devtools')  
 devtools::install_github("LiLin-biosoft/CasPhy", build_vignettes = T)
-browseVignettes('CasPhy')
+browseVignettes('CasPhy')  ## if you encounter any problem in building vignettes, there is one copy in vignettes.html.
 ```
 
 To use GPU acceleration, CUDA script is required:<br>
