@@ -86,14 +86,23 @@ LogicalVector int2binary(IntegerVector ve,int output_len=0){
 }
 
 // // [[Rcpp::export]]
-// std::vector<int> int2idx(IntegerVector ve){
-//   int i,j;
+// std::vector<int> int2idx(IntegerVector ve) {
 //   std::vector<int> output;
-//   for(i=0;i<ve.size();i++){
-//     for(j=0;j<32;j++){
-//       if(((ve(i)>>j)&1)==1){
-//         output.push_back(i*32+j);
+//   
+//   const int n = ve.size();
+//   for (int i = 0; i < n; ++i) {
+//     unsigned int value = static_cast<unsigned int>(ve[i]);
+//     int base = i * 32;
+//     while (value != 0) {
+//       unsigned int lowest = value & -value;
+//       int j = 0;
+//       unsigned int temp = lowest;
+//       while (temp > 1) {
+//         temp >>= 1;
+//         j++;
 //       }
+//       output.push_back(base + j);
+//       value &= value - 1;
 //     }
 //   }
 //   return output;
@@ -108,13 +117,7 @@ std::vector<int> int2idx(IntegerVector ve) {
     unsigned int value = static_cast<unsigned int>(ve[i]);
     int base = i * 32;
     while (value != 0) {
-      unsigned int lowest = value & -value;
-      int j = 0;
-      unsigned int temp = lowest;
-      while (temp > 1) {
-        temp >>= 1;
-        j++;
-      }
+      int j = __builtin_ctz(value);
       output.push_back(base + j);
       value &= value - 1;
     }
@@ -697,15 +700,28 @@ void printB(int x){
   Rprintf("\n");
 }
 
+// // [[Rcpp::export]]
+// IntegerVector edge2vector(IntegerMatrix edge,int maxIdx){
+//   int i;
+//   IntegerVector route(maxIdx);
+//   route.fill(-1);
+//   for(i=0;i<edge.nrow();i++){
+//     route(edge(i,1)-1)=edge(i,0)-1;
+//   }
+//   return route;
+// }
+
 // [[Rcpp::export]]
-IntegerVector edge2vector(IntegerMatrix edge,int maxIdx){
-  int i;
-  IntegerVector route(maxIdx);
-  route.fill(-1);
-  for(i=0;i<edge.nrow();i++){
-    route(edge(i,1)-1)=edge(i,0)-1;
+IntegerVector edge2vector(IntegerMatrix edge,int len){
+  //transform the edge into link vector to facilitate tip to root search
+  IntegerVector linkVector(len);
+  linkVector.fill(-1); // root remains the initial value, so it is linked to -1.
+  for(int i=0;i<edge.nrow();i++){
+    int ansIdx=edge(i,0)-1;
+    int desIdx=edge(i,1)-1;
+    linkVector(desIdx)=ansIdx;
   }
-  return route;
+  return linkVector;
 }
 
 template <typename T>
@@ -736,16 +752,30 @@ IntegerMatrix findNeighborWeighted(IntegerMatrix mat,int maxChar,NumericVector w
     int xidx[maxChar];
     int yidx[maxChar];
     int nchar=0;
-    for(x=0;x<mat.ncol();x++){
-      for(y=0;y<32;y++){
-        if(((mat(i,x)>>y)&1)==1){
-          idx[nchar]=x*32+y;
-          xidx[nchar]=x;
-          yidx[nchar]=y;
-          nchar++;
-        }
+    
+    int cols = mat.ncol();
+    for (int x = 0; x < cols; x++) {
+      uint32_t val = mat(i, x);
+      while (val) {
+        int bit = __builtin_ctz(val);
+        idx[nchar]=x*32+bit;
+        xidx[nchar] = x;
+        yidx[nchar] = bit;
+        nchar++;
+        val &= val - 1;
       }
     }
+    
+    // for(x=0;x<mat.ncol();x++){
+    //   for(y=0;y<32;y++){
+    //     if(((mat(i,x)>>y)&1)==1){
+    //       idx[nchar]=x*32+y;
+    //       xidx[nchar]=x;
+    //       yidx[nchar]=y;
+    //       nchar++;
+    //     }
+    //   }
+    // }
     if(radius!=0){
       double nshared=0;
       for(k=0;k<nchar;k++){
@@ -961,21 +991,25 @@ IntegerVector findNeighborWeightedParallel(int i,IntegerMatrix mat,int maxChar,N
 
 // [[Rcpp::export]]
 IntegerVector findNeighborUnweightedParallel(int i,IntegerMatrix mat,int maxChar,int n=10,double p=0.5,int radius=0){
-  int j,k,x,y;
+  int j,k;
   int nbin=((mat.nrow()-1)>>5)+1;
   IntegerVector mat_neighbor(nbin);
   int xidx[maxChar];
   int yidx[maxChar];
   int nchar=0;
-  for(x=0;x<mat.ncol();x++){
-    for(y=0;y<32;y++){
-      if(((mat(i,x)>>y)&1)==1){
-        xidx[nchar]=x;
-        yidx[nchar]=y;
-        nchar++;
-      }
+  
+  int cols = mat.ncol();
+  for (int x = 0; x < cols; x++) {
+    uint32_t val = mat(i, x);
+    while (val) {
+      int bit = __builtin_ctz(val);
+      xidx[nchar] = x;
+      yidx[nchar] = bit;
+      nchar++;
+      val &= val - 1;
     }
   }
+  
   if(radius!=0){
     for(j=0;j<mat.nrow();j++){
       int nshared=0;
@@ -1337,15 +1371,19 @@ IntegerVector findNeighborRangeUnweighted(int i,IntegerMatrix mat,int maxChar,In
   int xidx[maxChar];
   int yidx[maxChar];
   int nchar=0;
-  for(int x=0;x<mat.ncol();x++){
-    for(int y=0;y<32;y++){
-      if(((mat(i,x)>>y)&1)==1){
-        xidx[nchar]=x;
-        yidx[nchar]=y;
-        nchar++;
-      }
+  
+  int cols = mat.ncol();
+  for (int x = 0; x < cols; x++) {
+    uint32_t val = mat(i, x);
+    while (val) {
+      int bit = __builtin_ctz(val);
+      xidx[nchar] = x;
+      yidx[nchar] = bit;
+      nchar++;
+      val &= val - 1;
     }
   }
+  
   if(radius!=0){
     for(int x=0;x<range.ncol();x++){
       for(int y=0;x*32+y<mat.nrow()&&y<32;y++){
@@ -1397,7 +1435,6 @@ IntegerVector findNeighborRangeUnweighted(int i,IntegerMatrix mat,int maxChar,In
   }
   return output;
 }
-
 // [[Rcpp::export]]
 IntegerVector findNeighborRangeWeighted(int i,IntegerMatrix mat,int maxChar,IntegerMatrix range, int offset,NumericVector weight,int n=10,double p=0.5,double radius=0){
   IntegerVector output(range.ncol());
@@ -1406,17 +1443,31 @@ IntegerVector findNeighborRangeWeighted(int i,IntegerMatrix mat,int maxChar,Inte
   int yidx[maxChar];
   int nchar=0;
   double radiusSelf=0;
-  for(int x=0;x<mat.ncol();x++){
-    for(int y=0;y<32;y++){
-      if(((mat(i,x)>>y)&1)==1){
-        idx[nchar]=x*32+y;
-        xidx[nchar]=x;
-        yidx[nchar]=y;
-        nchar++;
-        radiusSelf+=weight(x*32+y);
-      }
+  
+  int cols = mat.ncol();
+  for (int x = 0; x < cols; x++) {
+    uint32_t val = mat(i, x);
+    while (val) {
+      int bit = __builtin_ctz(val);
+      xidx[nchar] = x;
+      yidx[nchar] = bit;
+      nchar++;
+      radiusSelf+=weight(x*32+bit);
+      val &= val - 1;
     }
   }
+  
+  // for(int x=0;x<mat.ncol();x++){
+  //   for(int y=0;y<32;y++){
+  //     if(((mat(i,x)>>y)&1)==1){
+  //       idx[nchar]=x*32+y;
+  //       xidx[nchar]=x;
+  //       yidx[nchar]=y;
+  //       nchar++;
+  //       radiusSelf+=weight(x*32+y);
+  //     }
+  //   }
+  // }
   if(radius!=0){
     for(int x=0;x<range.ncol();x++){
       for(int y=0;x*32+y<mat.nrow()&&y<32;y++){
@@ -1806,7 +1857,7 @@ IntegerVector radiusWeightedParallel(int i,IntegerMatrix mat,int maxChar,Numeric
 }
 
 // [[Rcpp::export]]
-NumericVector bsCollapse(IntegerMatrix edge,NumericVector edgeLen,NumericVector bs,double threshold=50){
+NumericVector bsCollapse(IntegerMatrix edge,NumericVector edgeLen,NumericVector bs,double threshold=0.5){
   int nnode=bs.size()+1;
   int ntip=edgeLen.size()+1-nnode;
   NumericVector output=edgeLen;
@@ -2648,8 +2699,39 @@ IntegerVector combineTransition(IntegerVector transition1,IntegerVector transiti
   return output;
 }
 
+// // [[Rcpp::export]]
+// std::vector<int> outmatFilterBit2(IntegerMatrix mat,IntegerVector rowIdx,IntegerVector state,int cutoff=1){
+//   std::vector<int> xidx;
+//   std::vector<int> yidx;
+//   std::vector<int> output;
+//   for(int i=0;i<state.size();i++){
+//     for(int j=0;j<32;j++){
+//       if(((state(i)>>j)&1)==1){
+//         xidx.push_back(i);
+//         yidx.push_back(j);
+//       }
+//     }
+//   }
+//   for(int i=0;i<rowIdx.size();i++){
+//     int tmp=rowIdx(i);
+//     int nFound=0;
+//     for(unsigned int k=0;k<xidx.size();k++){
+//       if(((mat(tmp,xidx[k])>>yidx[k])&1)==0){
+//         nFound++;
+//         if(nFound>=cutoff){
+//           break;
+//         }
+//       }
+//     }
+//     if(nFound<cutoff){
+//       output.push_back(tmp);
+//     }
+//   }
+//   return output;
+// }
+
 // [[Rcpp::export]]
-std::vector<int> outmatFilterBit2(IntegerMatrix mat,IntegerVector rowIdx,IntegerVector state,int cutoff=1){
+std::vector<int> outmatFilterBit2(IntegerMatrix mat,IntegerVector colIdx,IntegerVector state,int cutoff=1){
   std::vector<int> xidx;
   std::vector<int> yidx;
   std::vector<int> output;
@@ -2661,11 +2743,11 @@ std::vector<int> outmatFilterBit2(IntegerMatrix mat,IntegerVector rowIdx,Integer
       }
     }
   }
-  for(int i=0;i<rowIdx.size();i++){
-    int tmp=rowIdx(i);
+  for(int i=0;i<colIdx.size();i++){
+    int tmp=colIdx(i);
     int nFound=0;
     for(unsigned int k=0;k<xidx.size();k++){
-      if(((mat(tmp,xidx[k])>>yidx[k])&1)==0){
+      if(((mat(xidx[k],tmp)>>yidx[k])&1)==0){
         nFound++;
         if(nFound>=cutoff){
           break;
@@ -2680,19 +2762,26 @@ std::vector<int> outmatFilterBit2(IntegerMatrix mat,IntegerVector rowIdx,Integer
 }
 
 // [[Rcpp::export]]
-std::vector<int> outmatFilterIndel2(IntegerMatrix mat,IntegerVector rowIdx,IntegerVector state,int cutoff=1){
-  std::vector<int> idx;
+std::vector<int> outmatFilterBitBig(SEXP bigmat,IntegerVector colIdx,IntegerVector state,int cutoff=1){
+  XPtr<BigMatrix> xpMat(bigmat);
+  MatrixAccessor<int> mat=MatrixAccessor<int>(*xpMat);
+  
+  std::vector<int> xidx;
+  std::vector<int> yidx;
   std::vector<int> output;
   for(int i=0;i<state.size();i++){
-    if(state(i)>0){
-      idx.push_back(i);
+    for(int j=0;j<32;j++){
+      if(((state(i)>>j)&1)==1){
+        xidx.push_back(i);
+        yidx.push_back(j);
+      }
     }
   }
-  for(int i=0;i<rowIdx.size();i++){
+  for(int i=0;i<colIdx.size();i++){
+    int tmp=colIdx(i);
     int nFound=0;
-    int tmp=rowIdx(i);
-    for(unsigned int k=0;k<idx.size();k++){
-      if(mat(tmp,idx[k])!=state(idx[k])&&mat(tmp,idx[k])>=0){
+    for(unsigned int k=0;k<xidx.size();k++){
+      if(((mat[tmp][xidx[k]]>>yidx[k])&1)==0){
         nFound++;
         if(nFound>=cutoff){
           break;
@@ -2704,6 +2793,116 @@ std::vector<int> outmatFilterIndel2(IntegerMatrix mat,IntegerVector rowIdx,Integ
     }
   }
   return output;
+}
+
+// // [[Rcpp::export]]
+// std::vector<int> outmatFilterIndel2(IntegerMatrix mat,IntegerVector rowIdx,IntegerVector state,int cutoff=1){
+//   std::vector<int> idx;
+//   std::vector<int> output;
+//   for(int i=0;i<state.size();i++){
+//     if(state(i)>0){
+//       idx.push_back(i);
+//     }
+//   }
+//   for(int i=0;i<rowIdx.size();i++){
+//     int nFound=0;
+//     int tmp=rowIdx(i);
+//     for(unsigned int k=0;k<idx.size();k++){
+//       if(mat(tmp,idx[k])!=state(idx[k])&&mat(tmp,idx[k])>=0){
+//         nFound++;
+//         if(nFound>=cutoff){
+//           break;
+//         }
+//       }
+//     }
+//     if(nFound<cutoff){
+//       output.push_back(tmp);
+//     }
+//   }
+//   return output;
+// }
+
+// [[Rcpp::export]]
+std::vector<int> outmatFilterIndel2(IntegerMatrix mat,IntegerVector colIdx,IntegerVector state,int cutoff=1){
+  std::vector<int> idx;
+  std::vector<int> output;
+  for(int i=0;i<state.size();i++){
+    if(state(i)>0){
+      idx.push_back(i);
+    }
+  }
+  for(int i=0;i<colIdx.size();i++){
+    int nFound=0;
+    int tmp=colIdx(i);
+    for(unsigned int k=0;k<idx.size();k++){
+      if(mat(idx[k],tmp)!=state(idx[k])&&mat(idx[k],tmp)>=0){
+        nFound++;
+        if(nFound>=cutoff){
+          break;
+        }
+      }
+    }
+    if(nFound<cutoff){
+      output.push_back(tmp);
+    }
+  }
+  return output;
+}
+
+// [[Rcpp::export]]
+std::vector<int> outmatFilterIndelBig(SEXP bigmat,IntegerVector colIdx,IntegerVector state,int cutoff=1){
+  XPtr<BigMatrix> xpMat(bigmat);
+  MatrixAccessor<int> mat=MatrixAccessor<int>(*xpMat);
+  
+  std::vector<int> idx;
+  std::vector<int> output;
+  for(int i=0;i<state.size();i++){
+    if(state(i)>0){
+      idx.push_back(i);
+    }
+  }
+  for(int i=0;i<colIdx.size();i++){
+    int nFound=0;
+    int tmp=colIdx(i);
+    for(unsigned int k=0;k<idx.size();k++){
+      if(mat[tmp][idx[k]]!=state(idx[k])&&mat[tmp][idx[k]]>=0){
+        nFound++;
+        if(nFound>=cutoff){
+          break;
+        }
+      }
+    }
+    if(nFound<cutoff){
+      output.push_back(tmp);
+    }
+  }
+  return output;
+}
+
+// [[Rcpp::export]]
+IntegerMatrix subcols_bigmat(SEXP xp, Rcpp::IntegerVector cols) {
+  Rcpp::XPtr<BigMatrix> xpMat(xp);
+  BigMatrix* pMat = xpMat.get();
+  
+  const int nrow = pMat->nrow();
+  const int ncol = pMat->ncol();
+  const int ncol_new = cols.size();
+  
+  for (int j = 0; j < ncol_new; ++j) {
+    if (cols[j] < 1 || cols[j] > ncol) {
+      Rcpp::stop("col index out of range.");
+    }
+  }
+  
+  Rcpp::IntegerMatrix out(nrow, ncol_new);
+  MatrixAccessor<int> acc(*pMat);
+  
+  for (int j = 0; j < ncol_new; ++j) {
+    int* src = acc[cols[j] - 1];
+    int* dst = out.begin() + static_cast<R_xlen_t>(j) * nrow;
+    std::copy(src, src + nrow, dst);
+  }
+  return out;
 }
 
 // [[Rcpp::export]]
@@ -2718,9 +2917,11 @@ IntegerMatrix selectedNodeDes(IntegerMatrix edge,int nnode,int ntip,IntegerVecto
       output(node(i)>>5,i)=1<<(node(i)&31);
     }
   }
-  int** cacheMat=(int**)(malloc(cacheSize*sizeof(int*)));
+  // int** cacheMat=(int**)(malloc(cacheSize*sizeof(int*)));
+  int** cacheMat=(int**)(R_alloc(cacheSize,sizeof(int*)));
   for(int i=0;i<cacheSize;i++){
-    cacheMat[i]=(int*)(malloc(nbin*sizeof(int)));
+    // cacheMat[i]=(int*)(malloc(nbin*sizeof(int)));
+    cacheMat[i]=(int*)(R_alloc(nbin,sizeof(int)));
   }
   for(int i=0;i<cacheSize;i++){
     for(int j=0;j<nbin;j++){
@@ -2881,7 +3082,7 @@ int countCharEvo(IntegerVector xx, IntegerVector yy) {
 }
 
 // [[Rcpp::export]]
-Rcpp::List charAncestralEC(IntegerMatrix mat,IntegerMatrix edge,IntegerVector tipSize,int nnode,float minSize=10,float minRatio=2){
+Rcpp::List charAncestralEC(IntegerMatrix mat,IntegerMatrix edge,IntegerVector tipSize,int nnode,float minSize=0,float minRatio=0){
   int ntip=tipSize.size();
   IntegerVector nodeSize(nnode);
   nodeSize.fill(0);
@@ -2968,6 +3169,32 @@ float calcShared(std::vector<int> idx,IntegerVector seq,NumericVector weight){
   return shared;
 }
 
+// // [[Rcpp::export]]
+// IntegerMatrix calcAncestralBitReverse(
+//     IntegerVector seq1,IntegerVector bistate1,
+//     IntegerVector seq2,IntegerVector bistate2){
+//   
+//   int nbin=seq1.size();
+//   IntegerVector seqRes(nbin);
+//   IntegerVector bistateRes(nbin);
+//   for(int i=0;i<nbin;++i){
+//     const int s1 = seq1[i];
+//     const int s2 = seq2[i];
+//     const int bs1 = bistate1[i];
+//     const int bs2 = bistate2[i];
+//     
+//     const int diff = s1 ^ s2; //s1 and s2 is different
+//     const int conflict = diff & (bs1 | bs2); //different and one seq is bistate => res should be 0
+//     
+//     seqRes[i] = (s1 | s2) & ~conflict;
+//     bistateRes[i] = (diff & ~(bs1 ^ bs2)) | (bs1 & bs2); //res is bistate if bs1=0, bs2=0,diff=1 or bs1=1, bs2=1
+//   }
+//   IntegerMatrix output(nbin,2);
+//   output.column(0)=seqRes;
+//   output.column(1)=bistateRes;
+//   return(output);
+// }
+
 // [[Rcpp::export]]
 IntegerMatrix calcAncestralBitReverse(
     IntegerVector seq1,IntegerVector bistate1,
@@ -2976,7 +3203,26 @@ IntegerMatrix calcAncestralBitReverse(
   int nbin=seq1.size();
   IntegerVector seqRes(nbin);
   IntegerVector bistateRes(nbin);
-  for(int i=0;i<nbin;++i){
+  
+  size_t i = 0;
+  for (; i + 8 <= nbin; i += 8) {
+    __m256i s1_vec = _mm256_loadu_si256((__m256i*)&seq1[i]);
+    __m256i s2_vec = _mm256_loadu_si256((__m256i*)&seq2[i]);
+    __m256i bs1_vec = _mm256_loadu_si256((__m256i*)&bistate1[i]);
+    __m256i bs2_vec = _mm256_loadu_si256((__m256i*)&bistate2[i]);
+    
+    __m256i diff_vec=_mm256_xor_si256(s1_vec,s2_vec);
+    __m256i conflict_vec=_mm256_and_si256(_mm256_or_si256(bs1_vec,bs2_vec),diff_vec);
+    __m256i seqRes_vec=_mm256_andnot_si256(conflict_vec,_mm256_or_si256(s1_vec,s2_vec));
+    _mm256_storeu_si256((__m256i*)&seqRes[i], seqRes_vec);
+    
+    __m256i tmp1_vec=_mm256_andnot_si256(_mm256_xor_si256(bs1_vec,bs2_vec),diff_vec);
+    __m256i tmp2_vec=_mm256_and_si256(bs1_vec,bs2_vec);
+    __m256i bistateRes_vec=_mm256_or_si256(tmp1_vec,tmp2_vec);
+    _mm256_storeu_si256((__m256i*)&bistateRes[i], bistateRes_vec);
+  }
+  
+  for(;i<nbin;++i){
     const int s1 = seq1[i];
     const int s2 = seq2[i];
     const int bs1 = bistate1[i];
@@ -2987,12 +3233,37 @@ IntegerMatrix calcAncestralBitReverse(
     
     seqRes[i] = (s1 | s2) & ~conflict;
     bistateRes[i] = (diff & ~(bs1 ^ bs2)) | (bs1 & bs2); //res is bistate if bs1=0, bs2=0,diff=1 or bs1=1, bs2=1
-  }
+  }  
+  
   IntegerMatrix output(nbin,2);
   output.column(0)=seqRes;
   output.column(1)=bistateRes;
   return(output);
 }
+
+
+// // [[Rcpp::export]]
+// IntegerMatrix calcAncestralBitReverse2(
+//     IntegerVector seq1,IntegerVector bistate1,
+//     IntegerVector seq2,IntegerVector bistate2){
+//   
+//   int nbin=seq1.size();
+//   IntegerVector seqRes(nbin);
+//   IntegerVector bistateRes(nbin);
+//   for(int i=0;i<nbin;++i){
+//     const int s1 = seq1[i];
+//     const int s2 = seq2[i];
+//     const int bs1 = bistate1[i];
+//     const int bs2 = bistate2[i];
+//     
+//     seqRes[i]=(s1&s2)|(bs1&s2)|(bs2&s1);
+//     bistateRes[i] = (s1^s2)&(~(bs1|bs2));
+//   }
+//   IntegerMatrix output(nbin,2);
+//   output.column(0)=seqRes;
+//   output.column(1)=bistateRes;
+//   return(output);
+// }
 
 // [[Rcpp::export]]
 IntegerMatrix calcAncestralBitReverse2(
@@ -3002,7 +3273,29 @@ IntegerMatrix calcAncestralBitReverse2(
   int nbin=seq1.size();
   IntegerVector seqRes(nbin);
   IntegerVector bistateRes(nbin);
-  for(int i=0;i<nbin;++i){
+  
+  size_t i = 0;
+  for (; i + 8 <= nbin; i += 8) {
+    __m256i s1_vec = _mm256_loadu_si256((__m256i*)&seq1[i]);
+    __m256i s2_vec = _mm256_loadu_si256((__m256i*)&seq2[i]);
+    __m256i bs1_vec = _mm256_loadu_si256((__m256i*)&bistate1[i]);
+    __m256i bs2_vec = _mm256_loadu_si256((__m256i*)&bistate2[i]);
+    
+    // (s1&s2)|(bs1&s2)|(bs2&s1)
+    __m256i tmp1_vec=_mm256_and_si256(s1_vec,s2_vec);
+    __m256i tmp2_vec=_mm256_and_si256(bs1_vec,s2_vec);
+    __m256i tmp3_vec=_mm256_and_si256(bs2_vec,s1_vec);
+    __m256i seqRes_vec=_mm256_or_si256(_mm256_or_si256(tmp1_vec,tmp2_vec),tmp3_vec);
+    _mm256_storeu_si256((__m256i*)&seqRes[i], seqRes_vec);
+    
+    // (s1^s2)&(~(bs1|bs2))
+    tmp1_vec=_mm256_xor_si256(s1_vec,s2_vec);
+    tmp2_vec=_mm256_or_si256(bs1_vec,bs2_vec);
+    __m256i bistateRes_vec=_mm256_andnot_si256(tmp2_vec,tmp1_vec);
+    _mm256_storeu_si256((__m256i*)&bistateRes[i], bistateRes_vec);
+  }
+  
+  for(;i<nbin;++i){
     const int s1 = seq1[i];
     const int s2 = seq2[i];
     const int bs1 = bistate1[i];
@@ -3011,11 +3304,13 @@ IntegerMatrix calcAncestralBitReverse2(
     seqRes[i]=(s1&s2)|(bs1&s2)|(bs2&s1);
     bistateRes[i] = (s1^s2)&(~(bs1|bs2));
   }
+  
   IntegerMatrix output(nbin,2);
   output.column(0)=seqRes;
   output.column(1)=bistateRes;
   return(output);
 }
+
 
 // [[Rcpp::export]]
 Rcpp::List greedyJoinEdgeBitReverse(
@@ -4182,6 +4477,1147 @@ IntegerVector zipMat(IntegerVector ve){
       valueZipped|=(nuc<<((j+4)*4));
     }
     output(i)=valueZipped;
+  }
+  return output;
+}
+
+// [[Rcpp::export]]
+IntegerVector idx2weight(IntegerVector idx,int len){
+  IntegerVector output(len);
+  output.fill(0);
+  for(int i=0;i<idx.size();++i){
+    ++output(idx(i)-1);
+  }
+  return output;
+}
+
+
+// [[Rcpp::export]]
+Rcpp::IntegerVector calcDesStateBitReverse_AVX2(
+    Rcpp::IntegerVector seq1, 
+    Rcpp::IntegerVector seq2,
+    Rcpp::IntegerVector bistate2) {
+  
+  size_t n = seq1.size();
+  Rcpp::IntegerVector output(n);
+  if (n == 0) return output;
+  
+  size_t i = 0;
+  for (; i + 8 <= n; i += 8) {
+    __m256i s1_vec = _mm256_loadu_si256((__m256i*)&seq1[i]);
+    __m256i s2_vec = _mm256_loadu_si256((__m256i*)&seq2[i]);
+    __m256i bs2_vec = _mm256_loadu_si256((__m256i*)&bistate2[i]);
+    
+    // output = (s2 & ~bs2) | (s1 & bs2)
+    // output = (bs2 & s1) | (~bs2 & s2)
+    // output = s2 ^ (bs2 & (s1 ^ s2))
+    
+    __m256i xor_vec = _mm256_xor_si256(s1_vec, s2_vec); // s1 ^ s2
+    __m256i masked = _mm256_and_si256(xor_vec, bs2_vec); // bs2 & (s1 ^ s2)
+    __m256i result = _mm256_xor_si256(s2_vec, masked);   // s2 ^ (bs2 & (s1 ^ s2))
+    _mm256_storeu_si256((__m256i*)&output[i], result);
+  }
+  for (; i < n; ++i) {
+    int s1 = seq1[i];
+    int s2 = seq2[i];
+    int bs2 = bistate2[i];
+    output[i] = (s2 & ~bs2) | (s1 & bs2);
+  }
+  return output;
+}
+
+static inline void processTipNode_AVX2(
+    int* nodeState_ans,
+    const int* mat_col,
+    int* nodeBistate_ans,
+    int* nodeConflict_ans,
+    size_t nrow) {
+  
+  size_t i = 0;
+  __m256i zero = _mm256_setzero_si256();
+  __m256i all_ones = _mm256_set1_epi32(-1);
+  
+  for (; i + 8 <= nrow; i += 8) {
+    __m256i s1 = _mm256_loadu_si256((__m256i*)&nodeState_ans[i]);
+    __m256i s2 = _mm256_loadu_si256((__m256i*)&mat_col[i]);
+    __m256i bs1 = _mm256_loadu_si256((__m256i*)&nodeBistate_ans[i]);
+    __m256i conf = _mm256_loadu_si256((__m256i*)&nodeConflict_ans[i]);
+    
+    // 1. nodeState = s1 & s2
+    __m256i new_state = _mm256_and_si256(s1, s2);
+    
+    // 2. nodeBistate &= 0 
+    __m256i new_bistate = zero;
+    
+    // 3. nodeConflict |= (s1 ^ s2) & ~bs1
+    __m256i xor_result = _mm256_xor_si256(s1, s2);
+    __m256i not_bs1 = _mm256_andnot_si256(bs1, all_ones);
+    __m256i conflict = _mm256_and_si256(xor_result, not_bs1);
+    __m256i new_conf = _mm256_or_si256(conf, conflict);
+    
+    _mm256_storeu_si256((__m256i*)&nodeState_ans[i], new_state);
+    _mm256_storeu_si256((__m256i*)&nodeBistate_ans[i], new_bistate);
+    _mm256_storeu_si256((__m256i*)&nodeConflict_ans[i], new_conf);
+  }
+  
+  for (; i < nrow; ++i) {
+    int s1 = nodeState_ans[i];
+    int s2 = mat_col[i];
+    int bs1 = nodeBistate_ans[i];
+    
+    nodeState_ans[i] = s1 & s2;
+    nodeBistate_ans[i] = 0;  // & 0
+    nodeConflict_ans[i] |= (s1 ^ s2) & ~bs1;
+  }
+}
+
+static inline void processInternalNode_AVX2(
+    int* nodeState_ans, int* nodeState_des,
+    int* nodeBistate_ans, int* nodeBistate_des,
+    int* nodeConflict_ans, int* nodeConflict_des,
+    size_t nrow) {
+  
+  size_t i = 0;
+  const __m256i all_ones = _mm256_set1_epi32(-1);
+  
+  for (; i + 8 <= nrow; i += 8) {
+    __m256i s1 = _mm256_loadu_si256((const __m256i*)&nodeState_ans[i]);
+    __m256i s2 = _mm256_loadu_si256((const __m256i*)&nodeState_des[i]);
+    __m256i bs1 = _mm256_loadu_si256((const __m256i*)&nodeBistate_ans[i]);
+    __m256i bs2 = _mm256_loadu_si256((const __m256i*)&nodeBistate_des[i]);
+    __m256i conf_ans = _mm256_loadu_si256((const __m256i*)&nodeConflict_ans[i]);
+    __m256i conf_des = _mm256_loadu_si256((const __m256i*)&nodeConflict_des[i]);
+    
+    
+    __m256i new_s2 = _mm256_or_si256(s2, conf_des);
+    __m256i new_bs2 = _mm256_or_si256(bs2, conf_des);
+    __m256i new_s1 = _mm256_and_si256(s1, new_s2);
+    __m256i new_bs1 = _mm256_and_si256(bs1, new_bs2);
+    __m256i xor_result = _mm256_xor_si256(s1, new_s2);
+    __m256i bs_or = _mm256_or_si256(bs1, new_bs2);
+    __m256i not_bs_or = _mm256_andnot_si256(bs_or, all_ones);
+    __m256i conflict = _mm256_and_si256(xor_result, not_bs_or);
+    __m256i new_conf_ans = _mm256_or_si256(conf_ans, conflict);
+    
+    _mm256_storeu_si256((__m256i*)&nodeState_ans[i], new_s1);
+    _mm256_storeu_si256((__m256i*)&nodeBistate_ans[i], new_bs1);
+    _mm256_storeu_si256((__m256i*)&nodeState_des[i], new_s2);
+    _mm256_storeu_si256((__m256i*)&nodeBistate_des[i], new_bs2);
+    _mm256_storeu_si256((__m256i*)&nodeConflict_ans[i], new_conf_ans);
+  }
+  
+  for (; i < nrow; ++i) {
+    nodeState_des[i] |= nodeConflict_des[i];
+    nodeBistate_des[i] |= nodeConflict_des[i];
+    
+    int s1 = nodeState_ans[i];
+    int s2 = nodeState_des[i];
+    int bs1 = nodeBistate_ans[i];
+    int bs2 = nodeBistate_des[i];
+    
+    nodeState_ans[i] = s1 & s2;
+    nodeBistate_ans[i] &= bs2;
+    nodeConflict_ans[i] |= (s1 ^ s2) & ~(bs1 | bs2);
+  }
+}
+
+static inline __m256i popcount_swar_avx2(__m256i v) {
+  const __m256i mask1 = _mm256_set1_epi32(0x55555555);
+  const __m256i mask2 = _mm256_set1_epi32(0x33333333);
+  const __m256i mask4 = _mm256_set1_epi32(0x0f0f0f0f);
+  const __m256i mask8 = _mm256_set1_epi32(0x00ff00ff);
+  const __m256i mask16 = _mm256_set1_epi32(0x0000ffff);
+  
+  __m256i shifted = _mm256_srli_epi32(v, 1);
+  shifted = _mm256_and_si256(shifted, mask1);
+  v = _mm256_sub_epi32(v, shifted);
+  
+  __m256i temp = _mm256_and_si256(v, mask2);
+  shifted = _mm256_srli_epi32(v, 2);
+  shifted = _mm256_and_si256(shifted, mask2);
+  v = _mm256_add_epi32(temp, shifted);
+  
+  shifted = _mm256_srli_epi32(v, 4);
+  v = _mm256_add_epi32(v, shifted);
+  v = _mm256_and_si256(v, mask4);
+  
+  shifted = _mm256_srli_epi32(v, 8);
+  v = _mm256_add_epi32(v, shifted);
+  v = _mm256_and_si256(v, mask8);
+  
+  shifted = _mm256_srli_epi32(v, 16);
+  v = _mm256_add_epi32(v, shifted);
+  v = _mm256_and_si256(v, mask16);
+  
+  return v;
+}
+
+static inline int popcount_scalar(int x) {
+  int count = 0;
+  while (x != 0) {
+    x = x & (x - 1);
+    count++;
+  }
+  return count;
+}
+
+static inline int count_hamming_avx2(const int* a, const int* b, size_t n) {
+  size_t i = 0;
+  int count = 0;
+  __m256i sum_vec = _mm256_setzero_si256();
+  
+  for (; i + 8 <= n; i += 8) {
+    __m256i va = _mm256_loadu_si256((const __m256i*)&a[i]);
+    __m256i vb = _mm256_loadu_si256((const __m256i*)&b[i]);
+    __m256i vxor = _mm256_xor_si256(va, vb);
+    __m256i pop = popcount_swar_avx2(vxor);
+    sum_vec = _mm256_add_epi32(sum_vec, pop);
+  }
+  
+  int sum_array[8];
+  _mm256_storeu_si256((__m256i*)sum_array, sum_vec);
+  count = sum_array[0] + sum_array[1] + sum_array[2] + sum_array[3] +
+    sum_array[4] + sum_array[5] + sum_array[6] + sum_array[7];
+  
+  for (; i < n; ++i) {
+    count += popcount_scalar(a[i] ^ b[i]);
+  }
+  
+  return count;
+}
+
+// [[Rcpp::export]]
+Rcpp::List ancestralBitReverse_AVX2(IntegerMatrix mat,IntegerMatrix edge,int ntip,int nnode){
+  int nrow = mat.nrow();
+  IntegerMatrix nodeState(mat.nrow(),nnode);
+  nodeState.fill(0xffffffff);
+  IntegerMatrix nodeBistate(mat.nrow(),nnode);
+  nodeBistate.fill(0xffffffff);
+  IntegerMatrix nodeConflict(mat.nrow(),nnode);
+  nodeConflict.fill(0);
+  for(int i=edge.nrow()-1;i>=0;i--){
+    int ansIdx=edge(i,0)-1;
+    int desIdx=edge(i,1)-1;
+    if(desIdx<ntip){
+      int* nodeState_ans = &nodeState(0, ansIdx - ntip);
+      const int* mat_col = &mat(0, desIdx);
+      int* nodeBistate_ans = &nodeBistate(0, ansIdx - ntip);
+      int* nodeConflict_ans = &nodeConflict(0, ansIdx - ntip);
+      
+      processTipNode_AVX2(
+        nodeState_ans, mat_col,
+        nodeBistate_ans, nodeConflict_ans,
+        nrow
+      );
+    }else{
+      int* nodeState_ans = &nodeState(0, ansIdx - ntip);
+      int* nodeState_des = &nodeState(0, desIdx - ntip);
+      int* nodeBistate_ans = &nodeBistate(0, ansIdx - ntip);
+      int* nodeBistate_des = &nodeBistate(0, desIdx - ntip);
+      int* nodeConflict_ans = &nodeConflict(0, ansIdx - ntip);
+      int* nodeConflict_des = &nodeConflict(0, desIdx - ntip);
+      
+      processInternalNode_AVX2(
+        nodeState_ans, nodeState_des,
+        nodeBistate_ans, nodeBistate_des,
+        nodeConflict_ans, nodeConflict_des,
+        nrow
+      );
+    }
+  }
+  //update root
+  for(int j=0;j<mat.nrow();j++){
+    nodeState(j,0)&=~(nodeConflict(j,0)|nodeBistate(j,0));
+  }
+  
+  IntegerVector edgeLen(edge.nrow());
+  for(int i=0;i<edge.nrow();i++){
+    int ansIdx=edge(i,0)-1;
+    int desIdx=edge(i,1)-1;
+    if(desIdx<ntip){
+      const int* state_col = &nodeState(0, ansIdx - ntip);
+      const int* mat_col = &mat(0, desIdx);
+      edgeLen(i) = count_hamming_avx2(state_col, mat_col, nrow);
+    }else{
+      IntegerVector tmp = calcDesStateBitReverse_AVX2(
+        nodeState.column(ansIdx - ntip),
+        nodeState.column(desIdx - ntip),
+        nodeBistate.column(desIdx - ntip)
+      );
+      nodeState.column(desIdx-ntip)=tmp;
+      const int* state_col = &nodeState(0, ansIdx - ntip);
+      const int* tmp_ptr = tmp.begin();
+      edgeLen(i) = count_hamming_avx2(state_col, tmp_ptr, nrow);
+    }
+  }
+  return Rcpp::List::create(
+    Named("nodeState")=nodeState,
+    Named("edgeLen")=edgeLen
+  );
+}
+
+
+int bitCompare(int* xx,IntegerVector yy){
+  //if identical return 0, if xx>yy return 1, if xx<yy return 2
+  for(int i=0;i<yy.size();i++){
+    int tmp1=xx[i]&(~yy(i));
+    int tmp2=(~xx[i])&yy(i);
+    if(tmp1!=0){
+      return(1);
+    }else if(tmp2!=0){
+      return(2);
+    } 
+  }
+  return(0);
+}
+
+// [[Rcpp::export]]
+Rcpp::List findMaxNested(IntegerVector clade,IntegerMatrix edge,int ntip,int nnode){
+  //for a given set of tips (clade),find largest nodes in the tree (edge) within it
+  IntegerVector nodeState(ntip+nnode);
+  //first assume all nodes within the clade
+  nodeState.fill(1);
+  IntegerVector nodeSize(ntip+nnode);
+  nodeSize.fill(0);
+  for(int i=edge.nrow()-1;i>=0;i--){
+    int ansIdx=edge(i,0)-1;
+    int desIdx=edge(i,1)-1;
+    if(desIdx<ntip){
+      //if desIdx is a tip
+      int x=desIdx>>5; // divided by 32
+      int y=desIdx&31; // mod by 32
+      if(((clade(x)>>y)&1)==0){
+        //if desIdx is not in clade, mark both ans and des as outside the clade(nodeState=0)
+        nodeState(ansIdx)=0;
+        nodeState(desIdx)=0;
+      }else{
+        nodeSize(desIdx)=1;
+        nodeSize(ansIdx)+=1;
+      }
+    }else{
+      //if desIdx is a node
+      if(nodeState(desIdx)==0){
+        // if desIdx is not in clade, mark ans as not in clade(nodeState=0)
+        nodeState(ansIdx)=0;
+      }else{
+        nodeSize(ansIdx)+=nodeSize(desIdx);
+      }
+    } 
+  }
+  //after loop, nodeState of all nodes outside clade marked as 0 
+  
+  //search for edge that ans outside clade, des in clade, des is a largest node in clade
+  std::vector<int> output;
+  std::vector<int> outputSize;
+  for(int i=0;i<edge.nrow();i++){
+    int ansIdx=edge(i,0)-1;
+    int desIdx=edge(i,1)-1;
+    if(nodeState(ansIdx)==0&&nodeState(desIdx)==1){
+      output.push_back(desIdx+1);
+      outputSize.push_back(nodeSize(desIdx));
+    }
+  }
+  return Rcpp::List::create(Named("node")=output,Named("size")=outputSize);
+}
+
+IntegerVector countDifferentBits(int* xx, IntegerVector yy) {
+  // count different bits (count(0)) and unique bits in xx (count(1))
+  IntegerVector count(2);
+  count.fill(0);
+  for(int i=0;i<yy.size();i++){
+    int xorResult = xx[i] ^ yy(i);
+    while (xorResult != 0) {
+      xorResult = xorResult & (xorResult - 1);
+      count(0)++;
+    }
+    xorResult = xx[i] & (~yy(i));
+    while (xorResult != 0) {
+      xorResult = xorResult & (xorResult - 1);
+      count(1)++;
+    }
+  }
+  return count;
+}
+
+// [[Rcpp::export]]
+Rcpp::List approximateCompare(SEXP bitClade,int ntip,
+                              IntegerMatrix edge1,
+                              IntegerMatrix edge2,int nnode2,
+                              int cacheSize=8192,float threshold=0.1){
+  XPtr<BigMatrix> xpMat(bitClade);
+  MatrixAccessor<int> mat=MatrixAccessor<int>(*xpMat);
+  
+  int nnode1=xpMat->ncol()+1;
+  int nbin=xpMat->nrow();
+  IntegerMatrix cacheMat(nbin,cacheSize);
+  cacheMat.fill(0);
+  LogicalVector cacheFree(cacheSize);
+  cacheFree.fill(true);
+  int nUse=0;
+  IntegerVector node2cache(nnode2);
+  node2cache.fill(-1);
+  int cacheIdx=0;
+  
+  IntegerVector outputDis1(nnode1-1);
+  outputDis1.fill(ntip*2);
+  IntegerVector outputNode1(nnode1-1);
+  outputNode1.fill(0);
+  IntegerVector outputDis2(nnode2);
+  outputDis2.fill(ntip*2);
+  IntegerVector outputNode2(nnode2);
+  outputNode2.fill(0);
+  
+  //create search idx for edge1
+  IntegerVector linkVector=edge2vector(edge1,ntip+nnode1);
+  // IntegerVector linkVector(ntip+nnode1);
+  // for(int i=0;i<edge1.nrow();i++){
+  //   int ansIdx=edge1(i,0)-1;
+  //   int desIdx=edge1(i,1)-1;
+  //   linkVector(desIdx)=ansIdx;
+  // }
+  //the node of edge1 where node of edge2 start to search
+  IntegerMatrix startNode(nnode2,2);
+  startNode.fill(-1);
+  //the sizes of nodes in edge2
+  IntegerVector nodeSize2(ntip+nnode2);
+  nodeSize2.fill(0);
+  
+  for(int i=edge2.nrow()-1;i>=0;i--){
+    int ansIdx=edge2(i,0)-1;
+    int desIdx=edge2(i,1)-1;
+    if(desIdx<ntip){ // des is a tip
+      nodeSize2(desIdx)=1;
+      nodeSize2(ansIdx)++;
+      int x=desIdx>>5; // divided by 32
+      int y=desIdx&31; // mod by 32
+      int ansCacheIdx=node2cache(ansIdx-ntip); // find ans in cache
+      if(ansCacheIdx==-1){ //if ans is not in cache,store it in cache
+        if(nUse==cacheSize){
+          Rprintf("Run out of cache!\n");
+          return 0;
+        }
+        while(!cacheFree(cacheIdx)){ //find a free cache
+          cacheIdx++;
+          if(cacheIdx>=cacheSize){
+            cacheIdx=0;
+          }
+        }
+        ansCacheIdx=cacheIdx;
+        node2cache(ansIdx-ntip)=cacheIdx; // link node to cache
+        cacheFree(cacheIdx)=false; //mark cache as used
+        nUse++;
+      }
+      cacheMat(x,ansCacheIdx)|=(1<<y); // update the member of ans
+      // when ansIdx start searching, it can begin from the ancestor of desIdx in edge1
+      if(startNode(ansIdx-ntip,0)==-1){
+        startNode(ansIdx-ntip,0)=linkVector(desIdx);
+      }else{
+        startNode(ansIdx-ntip,1)=linkVector(desIdx);
+      }
+    }else{ // des is a node
+      nodeSize2(ansIdx)+=nodeSize2(desIdx);
+      if(node2cache(ansIdx-ntip)==-1){ //if the node is not in cache
+        if(nUse==cacheSize){
+          Rprintf("Run out of cache!\n");
+          return 0;
+        }
+        while(!cacheFree(cacheIdx)){ //find a free cache
+          cacheIdx++;
+          if(cacheIdx>=cacheSize){
+            cacheIdx=0;
+          }
+        }
+        node2cache(ansIdx-ntip)=cacheIdx; // link the node to cache
+        cacheFree(cacheIdx)=false; // mark cache as used
+        nUse++;
+      }
+      int desCacheIdx=node2cache(desIdx-ntip);
+      int ansCacheIdx=node2cache(ansIdx-ntip);
+      for(int x=0;x<nbin;x++){ // update member of ans
+        cacheMat(x,ansCacheIdx)|=cacheMat(x,desCacheIdx);
+      }
+      
+      //desIdx search for similar nodes in edge1
+      int nodeStop=startNode(desIdx-ntip,0); //the closest node in edge1
+      int xorStop=ntip*2; //the closest distance. Initial value is the maximal distance
+      for(int j=0;j<2;j++){
+        int currentNode=startNode(desIdx-ntip,j); //search begin from two startNode
+        int xorDis=0;
+        int nLarger=0; //nLarger is the No. tips only in node of edge1
+        while(currentNode>ntip&&nLarger<=nodeSize2(desIdx)*threshold){ //if currentNode does not reach root and currentNode is not much larger than desIdx
+          IntegerVector tmpDiff=countDifferentBits(mat[nnode1-1-(currentNode-ntip)],
+                                                   cacheMat.column(desCacheIdx));
+          xorDis=tmpDiff(0);
+          nLarger=tmpDiff(1);
+          int tmpIdx=nnode1-1-(currentNode-ntip);
+          if(outputDis1(tmpIdx)>=xorDis){ //update min distance of nodes in edge1 to nodes in edge2, >= means preferring nodes find later (larger nodes)
+            outputDis1(tmpIdx)=xorDis;
+            outputNode1(tmpIdx)=desIdx+1;
+          }
+          if(xorStop>=xorDis){ //update closest node in edge1 to desIdx, >= means preferring nodes find later (larger nodes)
+            xorStop=xorDis;
+            nodeStop=currentNode;
+            outputDis2(desIdx-ntip)=xorDis;
+            outputNode2(desIdx-ntip)=currentNode+1;
+          }
+          //move currentNode to upper and start new comparison
+          currentNode=linkVector(currentNode);
+        }
+      }
+      if(startNode(ansIdx-ntip,0)==-1){
+        startNode(ansIdx-ntip,0)=nodeStop;
+      }else{
+        startNode(ansIdx-ntip,1)=nodeStop;
+      }
+      //search finished
+      
+      cacheFree(desCacheIdx)=true; //unlink des from cache
+      nUse--;
+      for(int x=0;x<nbin;x++){ // clean cache
+        cacheMat(x,desCacheIdx)=0;
+      }
+    }
+  }
+  IntegerMatrix output1(nnode1-1,2);
+  IntegerMatrix output2(nnode2,3);
+  output1.column(0)=outputNode1;
+  output1.column(1)=outputDis1;
+  output2.column(0)=outputNode2;
+  output2.column(1)=outputDis2; 
+  for(int i=0;i<nnode2;i++){
+    output2(i,2)=nodeSize2(i+ntip);
+  }
+  return Rcpp::List::create(
+    Named("ref2qry")=output1,
+    Named("qry2ref")=output2
+  );
+}
+
+// [[Rcpp::export]]
+std::vector<int> findMaxDes(IntegerMatrix edge,int root,IntegerVector nodeState){
+  // for a given node (root), find largest descendants (nodeState>0)
+  std::vector<int> output;
+  std::vector<int> ances_stack;
+  ances_stack.push_back(root);
+  int i=0;
+  //search for the root
+  while(edge(i,0)!=root&&i<edge.nrow()){
+    i++;
+  }
+  //search for descendants
+  while(i<edge.nrow()&&ances_stack.size()>0){
+    int ansIdx=edge(i,0);
+    int desIdx=edge(i,1);
+    if(ansIdx==ances_stack.back()){//if ansIdx match current ancestor
+      if(nodeState(desIdx-1)>0){//if desIdx is one wanted node
+        output.push_back(desIdx);
+      }else{//if not, change the current ancestor
+        ances_stack.push_back(desIdx);
+      }
+      i++;
+    }else if(ansIdx<ances_stack.back()){// ansIdx returns to higher node
+      ances_stack.pop_back();
+    }else{// ansIdx is still under current ancestor
+      i++;
+    }
+  }
+  return output;
+}
+
+// [[Rcpp::export]]
+IntegerMatrix qry2ref(IntegerVector nodes,IntegerVector xorDis,int ntip,int nnode){
+  //transform data format from: each node in ref to:each node in qry
+  //ntip: No. tips nnode No. nodes in qry
+  
+  IntegerVector outputDis(nnode);
+  outputDis.fill(ntip*2);
+  IntegerVector outputNode(nnode);
+  outputNode.fill(-1);
+  for(int i=0;i<xorDis.size();i++){
+    int idx=nodes(i)-ntip-1;
+    if(idx>=0){
+      if(outputDis(idx)>xorDis(i)){
+        outputDis(idx)=xorDis(i);
+        outputNode(idx)=i+1+ntip;
+      }
+    }
+  }
+  IntegerMatrix output(nnode,2);
+  output.column(0)=outputNode;
+  output.column(1)=outputDis;
+  return output;
+}
+
+// [[Rcpp::export]]
+IntegerVector collapseNode(IntegerMatrix edge,IntegerVector nodeState,int ntip){
+  IntegerMatrix output=clone(edge);
+  IntegerVector linkVector=edge2vector(edge,ntip*2+1);
+  for(int i=0;i<output.nrow();i++){
+    int ansIdx=output(i,0)-1;
+    int desIdx=output(i,1)-1;
+    if(nodeState(desIdx)==0){
+      output(i,0)=-1;
+      output(i,1)=-1;
+    }else{
+      while(nodeState(ansIdx)==0){
+        ansIdx=linkVector(ansIdx);
+      }
+      output(i,0)=ansIdx+1;
+    }
+  }
+  return output;
+}
+
+// [[Rcpp::export]]
+std::vector<int> removeNestedNode(IntegerMatrix edge,IntegerVector nodes,int size){
+  IntegerVector linkVector=edge2vector(edge,size);
+  IntegerVector nodesVector(size);
+  nodesVector.fill(0);
+  for(int i=0;i<nodes.size();i++){
+    int idx=nodes(i)-1;
+    nodesVector(idx)=1;
+  }
+  std::vector<int> output;
+  for(int i=0;i<nodes.size();i++){
+    int idx=nodes(i)-1;
+    int currentNode=linkVector(idx);
+    while(currentNode!=-1){
+      if(nodesVector(currentNode)==1){
+        break;
+      }
+      currentNode=linkVector(currentNode);
+    }
+    if(currentNode==-1){
+      output.push_back(idx+1);
+    }
+  }
+  return output;
+}
+
+// [[Rcpp::export]]
+std::vector<int> buildNode(IntegerMatrix edge,IntegerVector nodeSize,IntegerVector nodes,int ntip,float threshold=0.1){
+  int maxIdx=nodeSize.size();
+  IntegerVector linkVector=edge2vector(edge,maxIdx);
+  IntegerVector inCount(maxIdx); //No. tips included in the group
+  inCount.fill(0);
+  IntegerVector passCount(maxIdx); //when search from nodes to root, No. times passed it.
+  passCount.fill(0);
+  int totalTips=0; //total tips from all nodes to join
+  
+  //prepare inCount and passCount
+  for(int i=0;i<nodes.size();i++){
+    int currentNode=nodes(i)-1;
+    totalTips+=nodeSize(currentNode); //count total tips
+    int inSize=nodeSize(currentNode);
+    do{
+      inCount(currentNode)+=inSize;
+      passCount(currentNode)++;
+      currentNode=linkVector(currentNode);
+    } while (currentNode!=-1);
+  }
+  
+  std::vector<int> nodesRun=Rcpp::as<std::vector<int>>(nodes); //candidate nodes to rebuild a clade 
+  while(nodesRun.size()>1){
+    std::vector<int> nodesMerge; //the ancestors input node attached to, these ancestors are direct decesdants of MRCA and can be joined together
+    IntegerVector included(maxIdx); //whether the node is included in nodesMerge
+    included.fill(0);
+    IntegerVector nodesAns(nodesRun.size()); //for each input nodes,which node it is attached to
+    nodesAns.fill(-1);
+    for(unsigned int i=0;i<nodesRun.size();i++){
+      int currentNode=nodesRun[i]-1;
+      do{
+        int tmp=linkVector(currentNode);
+        if((unsigned int)(passCount(tmp))>=nodesRun.size()){ // tmp is the most recent common ancestors of of nodesRun (all nodes passed it)
+          nodesAns(i)=currentNode; //ith input node is attached to the node found
+          if(included(currentNode)==0){ //if the node is not included
+            nodesMerge.push_back(currentNode);
+            included(currentNode)=1;
+          }
+          break;
+        }else{ //if not found, move to ancestor node
+          currentNode=tmp;        
+        }
+      } while (currentNode!=-1);
+    }
+    //sort nodeMerge by the value nodeSize-inCount*2
+    //when including node i, deltaDis=(nodeSize(i)-inCount(i))-inCount(i)
+    //So sort nodes by deltaDis
+    std::sort(
+      nodesMerge.begin(),
+      nodesMerge.end(),
+      [&](int i, int j){
+        return nodeSize(i)-inCount(i)*2<nodeSize(j)-inCount(j)*2;
+      }
+    );
+    std::vector<int> output;
+    int totalDelta=0; //delta distance when some nodes are included
+    int subTotalTips=0; //total tips joined together
+    int tmpAns=linkVector(nodesMerge[0]); //the MRCA of merged tips
+    for(unsigned int i=0;i<nodesMerge.size();i++){
+      int tmpNode=nodesMerge[i]; // the node index
+      int tmpDelta=nodeSize(tmpNode)-inCount(tmpNode)*2; //when including the node, the delta of distance
+      if(tmpDelta<=0){ //if delta<=0, including the node decrease the distance
+        totalDelta+=tmpDelta;
+        output.push_back(tmpNode+1);
+        subTotalTips+=nodeSize(tmpNode);
+      }else{ //if delta>0, including the node increase the distance
+        break;
+      }
+    }
+    //totalTips+totalDelta is the final distance
+    if((totalTips+totalDelta)<=totalTips*threshold){ // find some nodes to rebuild a similar clade
+      if(subTotalTips==nodeSize(tmpAns)){ //if all nodes joined rebuild their MRCA, return MRCA
+        output.clear();
+        output.push_back(tmpAns+1);
+      }
+      return(output);
+    }else{
+      int nextCommonAns=-1;
+      for(unsigned int i=0;i<nodesMerge.size();i++){
+        if(inCount(nodesMerge[i])>=totalTips*(1-threshold)){
+          nextCommonAns=nodesMerge[i];
+          break;
+        }
+      }
+      if(nextCommonAns!=-1){ //prepare nodes for next round of search
+        std::vector<int> newNodes;
+        for(int i=0;i<nodesAns.size();i++){
+          if(nodesAns[i]==nextCommonAns){
+            newNodes.push_back(nodesRun[i]);
+          }
+        }
+        nodesRun=newNodes;
+      }else{ //cannot find a subclade for next round of search
+        return(std::vector<int>());
+      }
+    }
+  }
+  // one node includes most tips from all nodes
+  if(nodesRun.size()==1){
+    int tmpNode=nodesRun[0]-1;
+    if(totalTips*threshold>=totalTips-inCount(tmpNode)+nodeSize(tmpNode)-inCount(tmpNode)){
+      return(nodesRun);
+    }
+  }
+  return(std::vector<int>());
+}
+
+// [[Rcpp::export]]
+Rcpp::List getDesIdx(IntegerMatrix edge,int ntip,int nnode){
+  IntegerVector output(edge.nrow());
+  IntegerVector nDes(nnode);
+  nDes.fill(0);
+  for(int i=0;i<edge.nrow();++i){
+    int ansIdx=edge(i,0)-ntip-1;
+    nDes(ansIdx)++;
+  }
+  IntegerVector offset(nnode+1);
+  offset.fill(0);
+  for(int i=1;i<=nnode;++i){
+    offset(i)=offset(i-1)+nDes(i-1);
+  }
+  nDes.fill(0);
+  for(int i=0;i<edge.nrow();++i){
+    int ansIdx=edge(i,0)-ntip-1;
+    int idx=nDes(ansIdx)+offset(ansIdx);
+    output(idx)=edge(i,1);
+    nDes(ansIdx)++;
+  }
+  return Rcpp::List::create(
+    Named("idx")=output,
+    Named("offset")=offset
+  );
+}
+
+// [[Rcpp::export]]
+IntegerVector getNodeDescendants(List desResult,int ntip,int node) {
+  IntegerVector idx = desResult["idx"];
+  IntegerVector offset = desResult["offset"];
+  
+  int ansIdx = node - ntip - 1;
+  int start = offset[ansIdx];
+  int numDescendants = offset[ansIdx+1]-offset[ansIdx];
+  
+  IntegerVector descendants(numDescendants);
+  for(int i = 0; i < numDescendants; ++i) {
+    descendants[i] = idx[start + i];
+  }
+  return descendants;
+}
+
+// [[Rcpp::export]]
+Rcpp::List approximateCompare2(SEXP bitClade,int ntip,
+                               IntegerMatrix edge1,
+                               IntegerMatrix edge2,int nnode2,
+                               int cacheSize=8192,float threshold=0.1){
+  XPtr<BigMatrix> xpMat(bitClade);
+  MatrixAccessor<int> mat=MatrixAccessor<int>(*xpMat);
+  
+  int nnode1=xpMat->ncol()+1; //root node is not included in bitClade
+  int nbin=xpMat->nrow();
+  IntegerMatrix cacheMat(nbin,cacheSize);
+  cacheMat.fill(0);
+  LogicalVector cacheFree(cacheSize);
+  cacheFree.fill(true);
+  int nUse=0;
+  IntegerVector node2cache(nnode2);  //ith element contains the cache idx of ith node 
+  node2cache.fill(-1);
+  int cacheIdx=0;
+  
+  IntegerVector outputDis1(nnode1-1);
+  outputDis1.fill(ntip*2);
+  IntegerVector outputNode1(nnode1-1);
+  outputNode1.fill(0);
+  IntegerVector outputDis2(nnode2);
+  outputDis2.fill(ntip*2);
+  IntegerVector outputNode2(nnode2);
+  outputNode2.fill(0);
+  
+  //create search idx for edge1
+  IntegerVector linkVector=edge2vector(edge1,ntip+nnode1);
+  
+  //create index to quick search of descendants in edge2  
+  Rcpp::List desResult=getDesIdx(edge2,ntip,nnode2);
+  
+  //the node of edge1 where node of edge2 stop search
+  IntegerVector nodeStop(ntip+nnode2);
+  //ntip is the idx of root node in edge1
+  nodeStop.fill(ntip);
+  //the sizes of nodes in edge2
+  IntegerVector nodeSize2(ntip+nnode2);
+  nodeSize2.fill(0);
+  
+  for(int i=edge2.nrow()-1;i>=0;i--){
+    int ansIdx=edge2(i,0)-1;
+    int desIdx=edge2(i,1)-1;
+    if(desIdx<ntip){ // des is a tip
+      nodeSize2(desIdx)=1;
+      nodeSize2(ansIdx)++;
+      int x=desIdx>>5; // divided by 32
+      int y=desIdx&31; // mod by 32
+      int ansCacheIdx=node2cache(ansIdx-ntip); // find ans in cache
+      if(ansCacheIdx==-1){ //if ans is not in cache,store it in cache
+        if(nUse==cacheSize){
+          Rprintf("Run out of cache!\n");
+          return 0;
+        }
+        while(!cacheFree(cacheIdx)){ //find a free cache
+          cacheIdx++;
+          if(cacheIdx>=cacheSize){
+            cacheIdx=0;
+          }
+        }
+        ansCacheIdx=cacheIdx;
+        node2cache(ansIdx-ntip)=cacheIdx; // link node to cache
+        cacheFree(cacheIdx)=false; //mark cache as used
+        nUse++;
+      }
+      cacheMat(x,ansCacheIdx)|=(1<<y); // update the member of ans
+      // when ansIdx start searching, it can begin from the ancestor of desIdx in edge1
+      nodeStop(desIdx)=linkVector(desIdx);
+    }else{ // des is a node
+      nodeSize2(ansIdx)+=nodeSize2(desIdx);
+      if(node2cache(ansIdx-ntip)==-1){ //if the node is not in cache
+        if(nUse==cacheSize){
+          Rprintf("Run out of cache!\n");
+          return 0;
+        }
+        while(!cacheFree(cacheIdx)){ //find a free cache
+          cacheIdx++;
+          if(cacheIdx>=cacheSize){
+            cacheIdx=0;
+          }
+        }
+        node2cache(ansIdx-ntip)=cacheIdx; // link the node to cache
+        cacheFree(cacheIdx)=false; // mark cache as used
+        nUse++;
+      }
+      int desCacheIdx=node2cache(desIdx-ntip);
+      int ansCacheIdx=node2cache(ansIdx-ntip);
+      for(int x=0;x<nbin;x++){ // update member of ans
+        cacheMat(x,ansCacheIdx)|=cacheMat(x,desCacheIdx);
+      }
+      
+      //desIdx search for similar nodes in edge1
+      IntegerVector startNode=getNodeDescendants(desResult,ntip,desIdx+1);
+      for(int j=0;j<startNode.size();++j){
+        startNode(j)=nodeStop(startNode(j)-1);
+      }
+      nodeStop(desIdx)=startNode(0);
+      int xorStop=ntip*2; //the closest distance. Initial value is the maximal distance
+      for(int j=0;j<startNode.size();++j){
+        int currentNode=startNode(j); //search begin from startNode
+        int xorDis=0;
+        int nLarger=0; //nLarger is the No. tips only in node of edge1
+        while(currentNode>ntip&&nLarger<=nodeSize2(desIdx)*threshold){ //if currentNode does not reach root and currentNode is not much larger than desIdx
+          IntegerVector tmpDiff=countDifferentBits(mat[nnode1-1-(currentNode-ntip)],
+                                                   cacheMat.column(desCacheIdx));
+          xorDis=tmpDiff(0);
+          nLarger=tmpDiff(1);
+          int tmpIdx=nnode1-1-(currentNode-ntip);
+          if(outputDis1(tmpIdx)>=xorDis){ //update min distance of nodes in edge1 to nodes in edge2, >= means preferring nodes find later (larger nodes)
+            outputDis1(tmpIdx)=xorDis;
+            outputNode1(tmpIdx)=desIdx+1;
+          }
+          if(xorStop>=xorDis){ //update closest node in edge1 to desIdx, >= means preferring nodes find later (larger nodes)
+            xorStop=xorDis;
+            nodeStop(desIdx)=currentNode;
+            outputDis2(desIdx-ntip)=xorDis;
+            outputNode2(desIdx-ntip)=currentNode+1;
+          }
+          //move currentNode to upper and start new comparison
+          currentNode=linkVector(currentNode);
+        }
+      }
+      //search finished
+      
+      cacheFree(desCacheIdx)=true; //unlink des from cache
+      nUse--;
+      for(int x=0;x<nbin;x++){ // clean cache
+        cacheMat(x,desCacheIdx)=0;
+      }
+    }
+  }
+  IntegerMatrix output1(nnode1,2);
+  output1(0,0)=ntip+1;
+  output1(0,1)=0;
+  int k=nnode1-2;
+  for(int i=1;i<nnode1;i++){
+    output1(i,0)=outputNode1(k);
+    output1(i,1)=outputDis1(k);
+    k--;
+  }  
+  IntegerMatrix output2(nnode2,3);
+  output2.column(0)=outputNode2;
+  output2.column(1)=outputDis2; 
+  for(int i=0;i<nnode2;i++){
+    output2(i,2)=nodeSize2(i+ntip);
+  }
+  output2(0,0)=ntip+1;
+  output2(0,1)=0;
+  return Rcpp::List::create(
+    Named("ref2qry")=output1,
+    Named("qry2ref")=output2
+  );
+}
+
+IntegerVector countDifferentBits_AVX2(int* xx, IntegerVector yy) {
+  // count different bits (count(0)) and unique bits in xx (count(1))
+  IntegerVector count(2);
+  count.fill(0);
+  
+  size_t n = yy.size();
+  size_t i = 0;
+  
+  __m256i sum_vec0 = _mm256_setzero_si256();
+  __m256i sum_vec1 = _mm256_setzero_si256();
+  
+  for (; i + 8 <= n; i += 8) {
+    __m256i va = _mm256_loadu_si256((const __m256i*)&xx[i]);
+    __m256i vb = _mm256_loadu_si256((const __m256i*)&yy[i]); 
+    
+    __m256i vxor = _mm256_xor_si256(va, vb);
+    __m256i pop0 = popcount_swar_avx2(vxor);
+    sum_vec0 = _mm256_add_epi32(sum_vec0, pop0);
+    
+    __m256i vand = _mm256_andnot_si256(vb, va);  // va & (~vb)
+    __m256i pop1 = popcount_swar_avx2(vand);
+    sum_vec1 = _mm256_add_epi32(sum_vec1, pop1);
+  }
+  
+  int sum_array0[8], sum_array1[8];
+  _mm256_storeu_si256((__m256i*)sum_array0, sum_vec0);
+  _mm256_storeu_si256((__m256i*)sum_array1, sum_vec1);
+  
+  int total_count0 = 0, total_count1 = 0;
+  for (int j = 0; j < 8; j++) {
+    total_count0 += sum_array0[j];
+    total_count1 += sum_array1[j];
+  }
+  
+  for (; i < n; ++i) {
+    total_count0 += popcount_scalar(xx[i] ^ yy[i]);
+    total_count1 += popcount_scalar(xx[i] & (~yy[i]));
+  }
+  
+  count(0) = total_count0;
+  count(1) = total_count1;
+  
+  return count;
+}
+
+// [[Rcpp::export]]
+Rcpp::List approximateCompare2_AVX2(SEXP bitClade,int ntip,
+                                    IntegerMatrix edge1,
+                                    IntegerMatrix edge2,int nnode2,
+                                    int cacheSize=8192,float threshold=0.1){
+  XPtr<BigMatrix> xpMat(bitClade);
+  MatrixAccessor<int> mat=MatrixAccessor<int>(*xpMat);
+  
+  int nnode1=xpMat->ncol()+1; //root node is not included in bitClade
+  int nbin=xpMat->nrow();
+  IntegerMatrix cacheMat(nbin,cacheSize);
+  cacheMat.fill(0);
+  LogicalVector cacheFree(cacheSize);
+  cacheFree.fill(true);
+  int nUse=0;
+  IntegerVector node2cache(nnode2);  //ith element contains the cache idx of ith node 
+  node2cache.fill(-1);
+  int cacheIdx=0;
+  
+  IntegerVector outputDis1(nnode1-1);
+  outputDis1.fill(ntip*2);
+  IntegerVector outputNode1(nnode1-1);
+  outputNode1.fill(0);
+  IntegerVector outputDis2(nnode2);
+  outputDis2.fill(ntip*2);
+  IntegerVector outputNode2(nnode2);
+  outputNode2.fill(0);
+  
+  //create search idx for edge1
+  IntegerVector linkVector=edge2vector(edge1,ntip+nnode1);
+  
+  //create index to quick search of descendants in edge2  
+  Rcpp::List desResult=getDesIdx(edge2,ntip,nnode2);
+  
+  //the node of edge1 where node of edge2 stop search
+  IntegerVector nodeStop(ntip+nnode2);
+  //ntip is the idx of root node in edge1
+  nodeStop.fill(ntip);
+  //the sizes of nodes in edge2
+  IntegerVector nodeSize2(ntip+nnode2);
+  nodeSize2.fill(0);
+  
+  for(int i=edge2.nrow()-1;i>=0;i--){
+    int ansIdx=edge2(i,0)-1;
+    int desIdx=edge2(i,1)-1;
+    if(desIdx<ntip){ // des is a tip
+      nodeSize2(desIdx)=1;
+      nodeSize2(ansIdx)++;
+      int x=desIdx>>5; // divided by 32
+      int y=desIdx&31; // mod by 32
+      int ansCacheIdx=node2cache(ansIdx-ntip); // find ans in cache
+      if(ansCacheIdx==-1){ //if ans is not in cache,store it in cache
+        if(nUse==cacheSize){
+          Rprintf("Run out of cache!\n");
+          return 0;
+        }
+        while(!cacheFree(cacheIdx)){ //find a free cache
+          cacheIdx++;
+          if(cacheIdx>=cacheSize){
+            cacheIdx=0;
+          }
+        }
+        ansCacheIdx=cacheIdx;
+        node2cache(ansIdx-ntip)=cacheIdx; // link node to cache
+        cacheFree(cacheIdx)=false; //mark cache as used
+        nUse++;
+      }
+      cacheMat(x,ansCacheIdx)|=(1<<y); // update the member of ans
+      // when ansIdx start searching, it can begin from the ancestor of desIdx in edge1
+      nodeStop(desIdx)=linkVector(desIdx);
+    }else{ // des is a node
+      nodeSize2(ansIdx)+=nodeSize2(desIdx);
+      if(node2cache(ansIdx-ntip)==-1){ //if the node is not in cache
+        if(nUse==cacheSize){
+          Rprintf("Run out of cache!\n");
+          return 0;
+        }
+        while(!cacheFree(cacheIdx)){ //find a free cache
+          cacheIdx++;
+          if(cacheIdx>=cacheSize){
+            cacheIdx=0;
+          }
+        }
+        node2cache(ansIdx-ntip)=cacheIdx; // link the node to cache
+        cacheFree(cacheIdx)=false; // mark cache as used
+        nUse++;
+      }
+      int desCacheIdx=node2cache(desIdx-ntip);
+      int ansCacheIdx=node2cache(ansIdx-ntip);
+      for(int x=0;x<nbin;x++){ // update member of ans
+        cacheMat(x,ansCacheIdx)|=cacheMat(x,desCacheIdx);
+      }
+      
+      //desIdx search for similar nodes in edge1
+      IntegerVector startNode=getNodeDescendants(desResult,ntip,desIdx+1);
+      for(int j=0;j<startNode.size();++j){
+        startNode(j)=nodeStop(startNode(j)-1);
+      }
+      nodeStop(desIdx)=startNode(0);
+      int xorStop=ntip*2; //the closest distance. Initial value is the maximal distance
+      for(int j=0;j<startNode.size();++j){
+        int currentNode=startNode(j); //search begin from startNode
+        int xorDis=0;
+        int nLarger=0; //nLarger is the No. tips only in node of edge1
+        while(currentNode>ntip&&nLarger<=nodeSize2(desIdx)*threshold){ //if currentNode does not reach root and currentNode is not much larger than desIdx
+          IntegerVector tmpDiff=countDifferentBits_AVX2(mat[nnode1-1-(currentNode-ntip)],
+                                                        cacheMat.column(desCacheIdx));
+          xorDis=tmpDiff(0);
+          nLarger=tmpDiff(1);
+          int tmpIdx=nnode1-1-(currentNode-ntip);
+          if(outputDis1(tmpIdx)>=xorDis){ //update min distance of nodes in edge1 to nodes in edge2, >= means preferring nodes find later (larger nodes)
+            outputDis1(tmpIdx)=xorDis;
+            outputNode1(tmpIdx)=desIdx+1;
+          }
+          if(xorStop>=xorDis){ //update closest node in edge1 to desIdx, >= means preferring nodes find later (larger nodes)
+            xorStop=xorDis;
+            nodeStop(desIdx)=currentNode;
+            outputDis2(desIdx-ntip)=xorDis;
+            outputNode2(desIdx-ntip)=currentNode+1;
+          }
+          //move currentNode to upper and start new comparison
+          currentNode=linkVector(currentNode);
+        }
+      }
+      //search finished
+      
+      cacheFree(desCacheIdx)=true; //unlink des from cache
+      nUse--;
+      for(int x=0;x<nbin;x++){ // clean cache
+        cacheMat(x,desCacheIdx)=0;
+      }
+    }
+  }
+  IntegerMatrix output1(nnode1,2);
+  output1(0,0)=ntip+1;
+  output1(0,1)=0;
+  int k=nnode1-2;
+  for(int i=1;i<nnode1;i++){
+    output1(i,0)=outputNode1(k);
+    output1(i,1)=outputDis1(k);
+    k--;
+  }  
+  IntegerMatrix output2(nnode2,3);
+  output2.column(0)=outputNode2;
+  output2.column(1)=outputDis2; 
+  for(int i=0;i<nnode2;i++){
+    output2(i,2)=nodeSize2(i+ntip);
+  }
+  output2(0,0)=ntip+1;
+  output2(0,1)=0;
+  return Rcpp::List::create(
+    Named("ref2qry")=output1,
+    Named("qry2ref")=output2
+  );
+}
+
+// [[Rcpp::export]]
+std::vector<int> findClone(IntegerMatrix& edge,int ntip,int nnode,NumericVector& bs,double threshold){
+  IntegerVector nodeState(nnode);
+  nodeState.fill(1);
+  nodeState[0]=0;
+  std::vector<int> output;
+  for(int i=0;i<edge.nrow();++i){
+    int ansIdx=edge(i,0)-ntip-1;
+    int desIdx=edge(i,1)-ntip-1;
+    if(nodeState[ansIdx]==0&&desIdx>=0){
+      if(bs[desIdx]>=threshold){
+        output.push_back(desIdx+1+ntip);
+      }else{
+        nodeState[desIdx]=0;
+      }
+    }
   }
   return output;
 }

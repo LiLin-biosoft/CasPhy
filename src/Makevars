@@ -1,1 +1,1 @@
-PKG_CXXFLAGS = -mavx2 -march=native -O3
+PKG_CXXFLAGS += -mavx2 -mbmi2 -march=native -O3

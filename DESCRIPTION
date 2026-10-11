@@ -1,15 +1,15 @@
 Package: CasPhy
 Type: Package
 Title: Phylogeney reconstruction
-Version: 1.5.1
+Version: 1.5.7
 Date: 2024-12-19
 Author: Li Lin
 Maintainer: Li Lin <linli@shanghaitech.edu.cn>
 Description: A fast and scalable phylogeny reconstrcution algorithm.
 License: GPL (>= 3)
-Imports: ape,bigmemory
-Depends: R (>= 4.0.0), BH, ape, bigmemory, parallel
-LinkingTo: Rcpp,BH,ape,bigmemory,parallel
+Imports: ape,bigmemory,parallel
+Depends: R (>= 4.0.0), BH, ape, bigmemory, parallel,jsonlite
+LinkingTo: Rcpp,BH,ape,bigmemory,parallel,jsonlite
 Suggests: knitr, rmarkdown
 VignetteBuilder: knitr
 RoxygenNote: 7.1.1

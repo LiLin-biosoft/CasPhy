@@ -1,4 +1,4 @@
-﻿---
+---
 title: "CasPhy"
 author: "Li Lin"
 date: "`r Sys.Date()`"
@@ -17,17 +17,16 @@ vignette: >
 
 ## Example of small size CRISPR-Cas9 lineage-tracing data
 
-`mat1k` contains the mutation profiles of 1000 cells. Each row is an OTU (operational taxonomic unit) and each column is a editable site. `-1` is missing data, `0` is un-mutated state and other integers are edited indels. The `rownames` of `mat` must be specified.
+`mat1k` contains the mutation profiles of 1000 cells. Each row is an OTU (operational taxonomic unit) and each column is a editable site. `-1` is missing data, `0` is un-mutated state and other integers are edited indels. The `rownames` of `mat` must be specified. `regularize.mat` relabels edited indels by consecutive integers.
 
 ```         
 suppressMessages(library(CasPhy))
 suppressMessages(library(RColorBrewer))
+
 data(mat1k)
 mat<-mat1k
-for(i in 1:ncol(mat)){
-  tmp<-sort(unique(c(mat[,i],-1,0)))
-  mat[,i]<-match(mat[,i],tmp)-2
-}
+
+mat<-regularize.mat(mat,mat)
 rownames(mat)<-paste0("C",1:nrow(mat))
 ```
 
@@ -39,10 +38,10 @@ dup_idx<-find.dup(imputed)
 imputed<-imputed[dup_idx==1:length(dup_idx),]
 ```
 
-We use `shared.mutation.join` to directly build the phylogeny and insert duplicated OTUs back to the phylogeny by `insert.dup`. `collapse.infoless` add branch length according to the number of mutations and collapse branches without mutation.
+We use `shared.mutation.join` to directly build the phylogeny and insert duplicated OTUs back to the phylogeny by `insert.dup`. `collapse.infoless` add branch length according to the number of mutations and collapse branches without mutation. If `cuda_path` is specified, phylogeny is built on GPU. If `cuda_path=NULL`, phylogeny is built on CPU.
 
 ```         
-smj_tree<-shared.mutation.join(imputed)
+smj_tree<-shared.mutation.join(imputed,bit_coded=F,weight=NULL,cuda_path="~/CasPhy/")
 smj_tree<-insert.dup(smj_tree,dup_idx,label=rownames(mat))
 smj_tree<-collapse.infoless(smj_tree,mat)
 ```
@@ -76,30 +75,42 @@ First impute data and remove duplicates.
 ```         
 data(mat10k)
 mat<-mat10k
-for(i in 1:ncol(mat)){
-  tmp<-sort(unique(c(mat[,i],-1,0)))
-  mat[,i]<-match(mat[,i],tmp)-2
-}
+
+mat<-regularize.mat(mat,mat)
 rownames(mat)<-paste0("C",1:nrow(mat))
-imputed<-iter.impute.packed(mat,ncore=10)
-dup_idx<-find.dup(imputed,ncore=10)
+imputed<-iter.impute.packed(mat,ncore=20)
+dup_idx<-find.dup(imputed,ncore=20)
 imputed<-imputed[dup_idx==1:length(dup_idx),]
 ```
 
-Large dataset should be first split into clusters for parallel computing. Parallel computing can only run on linux system. We use `split.data` to split the data into small clusters. `radius` is the minimum number of common mutations between neighbors. `p_shared` is the threshold used to break weakly connected OTUs. `ncore` is the number of CPU cores. `splt.summerize` is used to calculate the number of OTUs in resulting clusters. To use GPU acceleration, set `cuda_path` to the path of cuda scripts. Use `file_backed` to specify the prefix of temporary backing file.
-The value of `radius` depends on many factors including the number of editable sites, mutation rates and the topology. It should be manually adjusted to fit the scalability of downstream phylogenetic tools. Larger value results in more clusters with smaller size and smaller values results in fewer clusters with larger size.
+Large datasets should first be split into clusters for parallel computing. The integer matrix is first converted to bit-coded data. We use `run.split` to split the data into small clusters. `prefix` is the prefix for temporary files. `weight` is the weights of individual indels. If set to `NULL`, uniform weights are used. `data_type` is the type of data. The function first finds neighbors (the number of common mutations between neighbors is larger than the radius) for all OTUs. The value of radius is automatically optimized. `radius_initial` is the initial value for optimization. If `fixed` is set to True, auto-optimization is disabled and the initial value of radius is used. `step` is the tuning step of optimization. `radius_bound` is the lower bound of radius for optimization. `sizeBound` is the upper bound for the size of clusters (see below). `ratio_bound` is the bound of the ratio between the size of the backbone and the largest clusters. If the ratio between them is smaller than ratio_bound (which means that they are close enough), optimization stops. `p_shared` is the threshold used to break weakly connected OTUs. `min_size` is the minimum size of clusters. Clusters smaller than it will be broken into single OTUs. `try_limit` is the maximum number of iterations for optimization. `cuda_path` is the path of cuda scripts. `splt.summerize` returns the all clusters and their sizes.
 
 ```         
-splt<-split.data(imputed,radius=8,p_shared=0.8,ncore=10) ##do not use GPU
-splt<-split.data(imputed,radius=8,p_shared=0.8,ncore=10,file_backed="mat10k",cuda_path="~/CasPhy-cuda/build/") ##use GPU
+bitmat<-mat2bit(imputed,return.bit=T)
+splt<-run.split(
+  mat=bitmat$binary,prefix="mat10k",weight=NULL,data_type="binary",
+  radius_initial=10,fixed=F,
+  step=1,radius_bound=1,
+  sizeBound=c(100000L,0L),ratio_bound=1.2,p_shared=0.8,
+  min_size=10,try_limit=50,cuda_path="~/CasPhy/"
+)
 head(splt.summerize(splt),n=20)
 ```
 
-We use `h.partial.join` to reconstruct the phylogeny of each cluster and use `link.hcluster` to link all phylogenies together. Finally, we use `order.tip` to re-order the tip of the phylogeny to match the rownames of `imputed`. `prefix` is the prefix of temporary file. If `cuda_path` is specified, phylogenetic reconstruction of large clusters (\> `cuda_threshold`) will run on GPU.
+We reconstruct the phylogeny of each cluster using `h.partial.join` and link all phylogenies together with `link.hcluster`. We use `order.tip` to reorder the tips of the phylogeny so that they match the rownames of `imputed`. In `h.partial.join`, we set `bit_coded` to `False` because `imputed` is an integer matrix. `keep_cutoff` specifies the minimum number of unique mutations required for a mono-group; clusters with fewer unique mutations are broken. Clusters larger than `cuda_threshold` are built on the GPU, while the remaining clusters are built on the CPU. `ncore` is the number of cores used.
 
 ```         
-partial_phys<-h.partial.join(imputed,splt,ncore=10) ## do not use GPU
-partial_phys<-h.partial.join(imputed,splt,ncore=10,prefix="mat10k",cuda_path="~/CasPhy-cuda/build/",cuda_threshold=100) ##use GPU
+partial_phys<-h.partial.join(
+  mat=imputed,
+  splt=splt,
+  bit_coded=F,
+  weight=NULL,
+  keep_cutoff=1,
+  prefix="mat10k",
+  cuda_path="~/CasPhy/",
+  cuda_threshold=100,
+  ncore=10
+)
 final_tree<-link.hcluster(partial_phys)
 final_tree<-order.tip(final_tree,rownames(imputed))
 final_tree<-insert.dup(final_tree,dup_idx,label=rownames(mat))
@@ -130,27 +141,42 @@ heatmap(
 
 ## Bootstrap on CRISPR-Cas9 data
 
-We perform bootstrap analysis by assigning random weights to editable sites. Weights is a matrix, where column is editable site and row is indel.
+We performed bootstrap analysis by assigning random weights to editable sites. The weights are stored in a matrix, where columns correspond to editable sites and rows correspond to indels. Random weights were sampled uniformly from the interval [0.5, 1.5]. Bootstrap values were calculated using `cal.bs` with the method from the ape package.
 
 ```         
-nIndel<-max(apply(imputed,2,function(x){
-  length(unique(setdiff(x,c(0,-1))))
-}))
+nIndel<-max(diff(bitmat$loci))
 w<-list()
 set.seed(1)
-for(i in 1:10){
-  w[[i]]<-matrix(runif(nIndel*ncol(imputed)),nIndel,ncol(imputed))+0.5
+for(i in 1:5){
+  w[[i]]<-matrix(runif(nIndel*ncol(mat),min=0.5,max=1.5),nIndel,ncol(mat))
 }
 
 bstrees<-list()
-for(i in 1:10){
-  splt<-split.data(mat=imputed,weight=w[[i]],radius=8,p_shared=0.8,ncore=10,file_backed="mat10k",cuda_path="~/CasPhy-cuda/build/")
-  phys<-h.partial.join(mat=imputed,splt=splt,weight=w[[i]],ncore=10,prefix="mat10k",cuda_path="~/CasPhy-cuda/build/",cuda_threshold=100)
+for(i in 1:5){
+  splt<-run.split(
+    mat=bitmat$binary,prefix="mat10k",weight=w[[i]],data_type="binary",
+    radius_initial=10,fixed=F,
+    step=1,radius_bound=1,
+    sizeBound=c(100000L,0L),ratio_bound=1.2,p_shared=0.8,
+    min_size=10,try_limit=50,cuda_path="~/CasPhy/"
+  )
+  phys<-h.partial.join(
+    mat=imputed,
+    splt=splt,
+    bit_coded=F,
+    weight=w[[i]],
+    keep_cutoff=1,
+    prefix="mat10k",
+    cuda_path="~/CasPhy/",
+    cuda_threshold=100,
+    ncore=10
+  )
   tmp<-link.hcluster(phys)
   tmp<-order.tip(tmp,rownames(imputed))
   tmp<-insert.dup(tmp,dup_idx,label=rownames(mat))
   bstrees[[i]]<-tmp
 }
+bs_value<-cal.bs(final_tree,bstrees,ncore=10)
 ```
 
 ## Example of base-editor lineage-tracing data
@@ -165,15 +191,51 @@ dup_idx<-find.dup(matb,bit_coded=T,ncore=10)
 matb2<-matb[dup_idx==1:length(dup_idx),]
 ```
 
-Run phylogenetic reconstruction.
+Phylogeny built using `shared.mutation.join`.
 
 ```         
-splt<-split.data(matb2,bit_coded=T,radius=7,p_shared=0.8,ncore=10,file_backed="mat_binary",cuda_path="~/CasPhy-cuda/build/")
-splt.summerize(splt)
-phys<-h.partial.join(matb2,splt=splt,bit_coded=T,ncore=10,prefix="mat_binary",cuda_path="~/CasPhy-cuda/build/",cuda_threshold=100)
-final_tree<-link.hcluster(phys)
+smj_tree<-shared.mutation.join(matb2,bit_coded=T,weight=NULL,cuda_path="~/CasPhy/")
+smj_tree<-insert.dup(smj_tree,dup_idx,label=rownames(matb))
+smj_tree<-collapse.infoless(smj_tree,matb)
+heatmap(
+  mat_binary+1,
+  Rowv=as.dendrogram(as.hclust.phylo(as.ultrametric(multi2di(smj_tree)))),
+  Colv=NA,
+  labCol=NA,
+  labRow=NA,
+  cexCol=0.7,
+  scale="none",
+  col=c("white","red")
+)
+```
+
+Phylogeny built by parallel computing.
+
+```         
+splt<-run.split(
+  mat=matb2,prefix="mat_binary",weight=NULL,data_type="binary",
+  radius_initial=10,fixed=F,
+  step=2,radius_bound=2,
+  sizeBound=c(100000L,0L),ratio_bound=1.2,
+  min_size=10,try_limit=50,cuda_path="~/CasPhy/"
+)
+head(splt.summerize(splt),n=20)
+
+partial_phys<-h.partial.join(
+  mat=matb2,
+  splt=splt,
+  bit_coded=T,
+  weight=NULL,
+  keep_cutoff=1,
+  prefix="mat_binary",
+  cuda_path="~/CasPhy/",
+  cuda_threshold=100,
+  ncore=10
+)
+
+final_tree<-link.hcluster(partial_phys)
 final_tree<-order.tip(final_tree,rownames(matb2))
-final_tree<-insert.dup(final_tree,dup_idx,rownames(matb))
+final_tree<-insert.dup(final_tree,dup_idx,label=rownames(matb))
 final_tree<-collapse.infoless(final_tree,matb,bit_coded=T)
 
 heatmap(
@@ -190,176 +252,193 @@ heatmap(
 
 ## Bootstrap on base-editor data
 
-Weights is a vector for binary data.
+Weights is a vector for binary data. There are `ncol(matb)*32` sites, as each 32-bit integer stores the states of 32 sites. We randomly sample sites with replacement, using an equal number of sites, and convert them to weights.
 
 ```         
 w<-list()
 set.seed(1)
-for(i in 1:10){
-  w[[i]]<-runif(ncol(matb2)*32)+0.5
+nsite<-ncol(matb)*32
+for(i in 1:5){
+    w[[i]]<-idx2weight(sample(1:nsite,nsite,replace=T),nsite)
 }
 bstrees<-list()
-for(i in 1:10){
-  splt<-split.data(matb2,bit_coded=T,weight=w[[i]],radius=7,p_shared=0.8,ncore=10,file_backed="mat_binary",cuda_path="~/CasPhy-cuda/build/")
-  phys<-h.partial.join(matb2,splt,bit_coded=T,weight=w[[i]],ncore=10,prefix="mat_binary",cuda_path="~/CasPhy-cuda/build/",cuda_threshold=100)
-  tmp<-link.hcluster(phys)
+for(i in 1:5){
+  splt<-run.split(
+    mat=matb2,prefix="mat_binary",weight=w[[i]],data_type="binary",
+    radius_initial=10,fixed=F,
+    step=2,radius_bound=2,
+    sizeBound=c(100000L,0L),ratio_bound=1.2,
+    min_size=10,try_limit=50,cuda_path="~/CasPhy/"
+  )
+  head(splt.summerize(splt),n=20)
+
+  partial_phys<-h.partial.join(
+    mat=matb2,
+    splt=splt,
+    bit_coded=T,
+    weight=w[[i]],
+    keep_cutoff=1,
+    prefix="mat_binary",
+    cuda_path="~/CasPhy/",
+    cuda_threshold=100,
+    ncore=10
+  )
+
+  tmp<-link.hcluster(partial_phys)
   tmp<-order.tip(tmp,rownames(matb2))
-  bstrees[[i]]<-insert.dup(tmp,dup_idx,rownames(matb))
+  tmp<-insert.dup(tmp,dup_idx,label=rownames(matb))
+  bstrees[[i]]<-tmp
 }
+bs_value<-cal.bs(final_tree,bstrees,ncore=10)
 ```
 
 ## Example of DNA sequence data
 
-First, use `fasta2bin` in linux shell to transform fasta file to bin file. The source code of `fasta2bin` and example data can be found in the repository of cuda script.
+First, use `fasta2bin` in linux shell to convert fasta file `run1_1024.fasta` to bin file `run1_1024.bin`.
 
 ```         
-~/CasPhy-cuda/build/fasta2bin test.fasta test.bin test_names.txt test_positions.txt
+~/CasPhy-cuda/build/fasta2bin run1_1024.fasta run1_1024
 ```
 
-Then, read the bin file. For DNA sequence data, each column is an OTU.
+Then, read the bin file and the true phylogeny. For DNA sequence data, each column is an OTU.
 
 ```         
-mat<-read.bin2mat("test.bin")
+mat<-read.bin2mat("run1_1024.bin")
+truth_tree<-read.tree("run1_1024_truth.tre")
 ```
 
-Use `split.data.DNA` to split the data. Both `split.data` and `split.data.DNA` can be called on result from previous run to further split one cluster into smaller ones. `splt` is the result from previous run. `splt_idx` is the index of cluster you want to split.
+Use `run.split` to split the data. Set `data_type` to "DNA"
 
 ```         
-splt<-cbind(rep(1,ncol(mat)),0)
-splt<-split.data.DNA(
-  mat=mat,splt=splt,splt_idx=1,
-  radius=1300,p_shared=0.8,
-  file_backed="test__M1",
-  cuda_path="~/CasPhy-cuda/build/",verbose=T
+splt<-run.split(
+  mat=mat,prefix="run1_1024",data_type="DNA",radius_initial=1200,
+  fixed=F,step=10,radius_bound=10,
+  sizeBound=c(100000L,0L),cuda_path="~/CasPhy/"
 )
+head(splt.summerize(splt),n=20)
 ```
 
-We further split cluster 2 from the previous run. The result now contains three layers.
+CasPhy currently supports phylogenetic reconstruction using either VeryFastTree or RAxML. We begin with the VeryFastTree version. `input_file` is the filename of the input data. `sample_size` is the proportion of outgroups sampled for placement. For small datasets, it is set to 1 (using all outgroups). For large datasets (\>100,000 OTUs), it can be set to a smaller value (e.g., 0.5) to reduce the GPU workload. In large datasets, a smaller value will not strongly affect the results. `pct_threshold` is the threshold for the percentage of outgroups placed in one branch. If more outgroups than this value are placed in one branch, the branch is broken. `nbp_threshold` is the threshold for recognizing distantly related outgroups. Outgroups with fewer shared nucleotides than this value are not taken into account. `file_backed` is a parameter passed to the bigmemory package specifying whether the matrix is stored in memory or in a file. `vft_cmd` is the running command for VeryFastTree. `-nt`, specifying the input file, is added automatically. Other options can be specified in this string. After phylogenetic reconstruction, the result is compared with the true phylogeny using the Robinson-Foulds distance.
 
 ```         
-splt<-split.data.DNA(
-  mat=mat,splt=splt,splt_idx=2,
-  radius=1400,p_shared=0.8,
-  file_backed="test__M2",
-  cuda_path="~/CasPhy-cuda/build/",verbose=T
+phys<-h.partial.join.vft(
+  input_file="run1_1024.bin",
+  splt=splt,
+  prefix="run1_1024",
+  sample_size=1,
+  pct_threshold=0.001,
+  nbp_threshold=1000,
+  file_backed=T,
+  vft_cmd="VeryFastTree -nosupport -fastest -threads 8",
+  cuda_path="~/CasPhy/",
+  ncore=10
 )
-head(splt.summerize(splt))
-tail(splt.summerize(splt))
+vft_tree<-link.hcluster2(phys)
+phangorn::RF.dist(truth_tree,vft_tree,normalize=T,check.labels=T,rooted=F)
 ```
 
-To reduce the memory usage in parallel computing, the matrix should be a big memory object.
+Next, we use the RAxML version. Here, `raxml_cmd` is the command used to run RAxML-ng, and `epa_cmd` is the command used to run EPA-ng. Options specifying the input and output are added automatically.
 
 ```         
-mat<-read.bin2bigmat("test.bin")
-mat_desc<-describe(mat)
-tipname<-paste0("C",1:ncol(mat))
+phys<-h.partial.join.raxml(
+  input_file="run1_1024.bin",
+  splt=splt,
+  prefix="run1_1024",
+  sample_size=1,
+  raxml_cmd="raxml-ng --redo --model GTR+G --force perf_threads --tree pars{1} --threads auto {4}",
+  epa_cmd="epa-ng --redo --threads 4",
+  ncore=10
+)
+rax_tree<-link.hcluster2(phys)
+phangorn::RF.dist(truth_tree,rax_tree,normalize=T,check.labels=T,rooted=F)
 ```
 
-Build the phylogeny for all clusters in layer 3 using `partial.join.DNA`. We perform parallel computing with 4 threads. The maximum number of threads depends on the number of CPU cores and the total RAM of your computer. `mat_desc` is the descriptor object of matrix. `tipname` is the sequence name. There must be two copies of the matrix. `matfile` is the filename of the other copy in hard disk.
+In general, the RAxML version is slower than the VeryFastTree version but is more accurate.
 
+For large datasets, `run.split` can be applied multiple times to further reduce cluster sizes. For example, we can change `sizeBound` to `c(100L, 0L)` and run the scripts again. `sizeBound` specifies the maximum size of the backbone (the first value) and the maximum size of the largest clusters (the second value). If set to 0, there is no constraint. By setting `sizeBound = c(100L, 0L)`, we constrain the backbone size to below 100. As a result, the cluster sizes in the second layer will be larger.
 
 ```         
-splt<-cbind(splt,0)
-layer<-3
-clustIdx<-setdiff(sort(unique(splt[,layer])),0)
-partial_res_collected<-list()
-nProcessed<-0
-while(nProcessed<length(clustIdx)){
-  cl<-makeForkCluster(4)
-  tmp_res<-parLapply(cl,clustIdx[(nProcessed+1):min((nProcessed+4),length(clustIdx))],partial.join.DNA,
-                     mat_desc=mat_desc,
-                     tipname=tipname,
-                     matfile="test.bin",
-                     ansMat_desc=NULL,
-                     nodename=NULL,
-                     splt=splt,
-                     layer=layer,
-                     prefix="test",
-                     cuda_path="~/CasPhy-cuda/build/")
-  stopCluster(cl)
-  partial_res_collected<-c(partial_res_collected,tmp_res)
-  nProcessed<-nProcessed+4
+splt<-run.split(
+  mat=mat,prefix="run1_1024",data_type="DNA",radius_initial=1200,
+  fixed=F,step=10,radius_bound=10,
+  sizeBound=c(100L,0L),cuda_path="~/CasPhy/"
+)
+head(splt.summerize(splt),n=20)
+```
+
+Then, we further split the second cluster. `splt` is the result from the previous run, and `idx` is the index of the cluster to be further split.
+
+```         
+splt<-run.split(
+  mat=mat,splt=splt,idx=2,prefix="run1_1024",data_type="DNA",radius_initial=1200,
+  fixed=F,step=10,radius_bound=10,
+  sizeBound=c(100000L,0L),cuda_path="~/CasPhy/"
+)
+head(splt.summerize(splt),n=20)
+```
+
+Now, the size of the second cluster is smaller, as some OTUs are grouped into new clusters in the third layer. We use VeryFastTree and RAxML to build the phylogeny.
+
+```         
+phys<-h.partial.join.vft(
+  input_file="run1_1024.bin",
+  splt=splt,
+  prefix="run1_1024",
+  sample_size=1,
+  pct_threshold=0.001,
+  nbp_threshold=1000,
+  file_backed=T,
+  vft_cmd="VeryFastTree -nosupport -fastest -threads 8",
+  cuda_path="~/CasPhy/",
+  ncore=10
+)
+vft_tree<-link.hcluster2(phys)
+phangorn::RF.dist(truth_tree,vft_tree,normalize=T,check.labels=T,rooted=F)
+
+phys<-h.partial.join.raxml(
+  input_file="run1_1024.bin",
+  splt=splt,
+  prefix="run1_1024",
+  sample_size=1,
+  raxml_cmd="raxml-ng --redo --model GTR+G --force perf_threads --tree pars{1} --threads auto {4}",
+  epa_cmd="epa-ng --redo --threads 4",
+  ncore=10
+)
+rax_tree<-link.hcluster2(phys)
+phangorn::RF.dist(truth_tree,rax_tree,normalize=T,check.labels=T,rooted=F)
+```
+
+This approach is designed to make CasPhy scalable to very large datasets. For small datasets, it is less accurate.
+
+## Tips for Splitting the Data
+
+The appropriate value of `radius_initial` depends on the number of features and the mutation rates, so no single default value will suit most datasets. Since CasPhy runs faster with fewer neighbors (i.e., a larger radius), it is best to start with a large value. In addition, a larger `ratio_bound` causes CasPhy to stop optimization earlier. For very large datasets, it is better to determine an optimal radius using a down-sampled dataset and then apply that fixed value to the full dataset. These settings mainly affect parallel efficiency and running time. Although different settings may produce slight differences in the topology, they will not strongly affect accuracy.
+
+## bootstrap of lineage-tracing data based on transfer support (experimental)
+
+This section describes the tools used to construct a consensus tree and calculate bootstrap support values from bootstrap trees derived from lineage-tracing data (rooted phylogeny). First, we load an example bootstrap analysis. The first tree in the list is the maximum parsimony tree, and the remaining trees are bootstrap trees generated using random weights. The tip order must be identical across all trees.
+
+```         
+phys<-read.tree(file="test.bstrees")
+for(i in 2:length(phys)){
+  phys[[i]]<-order.tip(phys[[i]],phys[[1]]$tip.label)
 }
 ```
 
-Use `layer.summarize` to summarize the results. We have some pseudo-OTUs from layer 3. Their mutation profiles are stored in `ansMat`. `splt` is also updated. `phys` contains the phylogenies within pseudo-OTUs.
+Next, we construct the consensus tree. `approximate.consensus` builds an approximate consensus phylogeny in which all clades with transfer support greater than `1-threshold` in more than half of the trees are included, even if they do not appear in the maximum parsimony tree.
 
 ```         
-res_summarized<-layer.summarize(partial_res_collected,clustIdx,splt,layer)
-phys<-res_summarized$phys
-tmp<-res_summarized$ansMat
-nodename<-colnames(res_summarized$ansMat)
-ansMat<-as.big.matrix(tmp)
-ansMat_desc<-describe(ansMat)
-splt<-res_summarized$splt
+consensus_tree<-approximate.consensus(phys=phys,prefix="test",threshold=0.05,ncore=11,CUDA_path="~/CasPhy/")
 ```
 
-Next, we build the phylogeny for all clusters in layer 2. `ansMat_desc` is the descriptor file of pseudo-OTU matrix. `nodename` is the name of pseudo-OTUs.
+Finally, we calculate the bootstrap values for all clades in the consensus tree.
 
 ```         
-layer<-2
-clustIdx<-setdiff(sort(unique(splt[,layer])),0)
-partial_res_collected<-list()
-nProcessed<-0
-while(nProcessed<length(clustIdx)){
-  cl<-makeForkCluster(4)
-  tmp_res<-parLapply(cl,clustIdx[(nProcessed+1):min((nProcessed+4),length(clustIdx))],partial.join.DNA,
-                     mat_desc=mat_desc,
-                     tipname=tipname,
-                     matfile="test.bin",
-                     ansMat_desc=ansMat_desc,
-                     nodename=nodename,
-                     splt=splt,
-                     layer=layer,
-                     prefix="test",
-                     cuda_path="~/CasPhy-cuda/build/")
-  stopCluster(cl)
-  partial_res_collected<-c(partial_res_collected,tmp_res)
-  nProcessed<-nProcessed+4
-}
-  
-res_summarized<-layer.summarize(partial_res_collected,clustIdx,splt,layer)
-phys<-c(phys,res_summarized$phys)
-tmp<-cbind(as.matrix(ansMat),res_summarized$ansMat)
-nodename<-c(nodename,colnames(res_summarized$ansMat))
-ansMat<-as.big.matrix(tmp)
-ansMat_desc<-describe(ansMat)
-rm(tmp)
-splt<-res_summarized$splt
+bootstrap_value<-cal.abs(consensus_tree,phys,prefix="test",threshold=0.05,ncore=11)
 ```
 
-Next, we build the phylogeny for layer 1.
+The first column of `bootstrap_value` contains the node indices. The second column contains the bootstrap values, defined as the proportion of trees that contain a similar clade with transfer support greater than `1 - threshold`. The third column contains the clade sizes. The bootstrap values of a few clades may be below 0.5. These represent clades that are absent from the maximum parsimony phylogeny. CasPhy attempted to reconstruct them in the consensus phylogeny but was unsuccessful. If you do not need clades that are absent from the maximum parsimony phylogeny, you can directly calculate the bootstrap values in the maximum parsimony phylogeny:
 
 ```         
-layer<-1
-clustIdx<-setdiff(sort(unique(splt[,layer])),0)
-partial_res_collected<-list()
-partial_res_collected[[1]]<-partial.join.DNA(clustIdx,
-                   mat_desc=mat_desc,
-                   tipname=tipname,
-                   matfile="test.bin",
-                   ansMat_desc=ansMat_desc,
-                   nodename=nodename,
-                   splt=splt,
-                   layer=layer,
-                   prefix="test",
-                   cuda_path="~/CasPhy-cuda/build/")
-res_summarized<-layer.summarize(partial_res_collected,clustIdx,splt,layer)
-phys<-c(phys,res_summarized$phys)
-```
-
-Finally, we link all phylogenies together to build the final tree.
-
-```         
-final_tree<-link.hcluster(phys)
-final_tree<-order.tip(final_tree,tipname)
-seqname<-as.character(read.table(file="test_names.txt",header=T,sep=",")[,1])
-final_tree$tip.label<-seqname
-```
-
-We can calculate the Robison-Foulds distance between the reconstructed and the true phylogenies by package `phangorn`. The true phylogeny can be found in the repository of cuda script.
-
-```         
-truth_tree<-read.tree(file="test_truth.tre")
-phangorn::RF.dist(truth_tree,final_tree,normalize=T,check.labels=T,rooted=F)
+bootstrap_value<-cal.abs(phys[[1]],phys,prefix="test",threshold=0.05,ncore=11)
 ```

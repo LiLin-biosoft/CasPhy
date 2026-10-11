@@ -302,14 +302,14 @@ BEGIN_RCPP
 END_RCPP
 }
 // edge2vector
-IntegerVector edge2vector(IntegerMatrix edge, int maxIdx);
-RcppExport SEXP _CasPhy_edge2vector(SEXP edgeSEXP, SEXP maxIdxSEXP) {
+IntegerVector edge2vector(IntegerMatrix edge, int len);
+RcppExport SEXP _CasPhy_edge2vector(SEXP edgeSEXP, SEXP lenSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< IntegerMatrix >::type edge(edgeSEXP);
-    Rcpp::traits::input_parameter< int >::type maxIdx(maxIdxSEXP);
-    rcpp_result_gen = Rcpp::wrap(edge2vector(edge, maxIdx));
+    Rcpp::traits::input_parameter< int >::type len(lenSEXP);
+    rcpp_result_gen = Rcpp::wrap(edge2vector(edge, len));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -749,30 +749,70 @@ BEGIN_RCPP
 END_RCPP
 }
 // outmatFilterBit2
-std::vector<int> outmatFilterBit2(IntegerMatrix mat, IntegerVector rowIdx, IntegerVector state, int cutoff);
-RcppExport SEXP _CasPhy_outmatFilterBit2(SEXP matSEXP, SEXP rowIdxSEXP, SEXP stateSEXP, SEXP cutoffSEXP) {
+std::vector<int> outmatFilterBit2(IntegerMatrix mat, IntegerVector colIdx, IntegerVector state, int cutoff);
+RcppExport SEXP _CasPhy_outmatFilterBit2(SEXP matSEXP, SEXP colIdxSEXP, SEXP stateSEXP, SEXP cutoffSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< IntegerMatrix >::type mat(matSEXP);
-    Rcpp::traits::input_parameter< IntegerVector >::type rowIdx(rowIdxSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type colIdx(colIdxSEXP);
     Rcpp::traits::input_parameter< IntegerVector >::type state(stateSEXP);
     Rcpp::traits::input_parameter< int >::type cutoff(cutoffSEXP);
-    rcpp_result_gen = Rcpp::wrap(outmatFilterBit2(mat, rowIdx, state, cutoff));
+    rcpp_result_gen = Rcpp::wrap(outmatFilterBit2(mat, colIdx, state, cutoff));
+    return rcpp_result_gen;
+END_RCPP
+}
+// outmatFilterBitBig
+std::vector<int> outmatFilterBitBig(SEXP bigmat, IntegerVector colIdx, IntegerVector state, int cutoff);
+RcppExport SEXP _CasPhy_outmatFilterBitBig(SEXP bigmatSEXP, SEXP colIdxSEXP, SEXP stateSEXP, SEXP cutoffSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type bigmat(bigmatSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type colIdx(colIdxSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type state(stateSEXP);
+    Rcpp::traits::input_parameter< int >::type cutoff(cutoffSEXP);
+    rcpp_result_gen = Rcpp::wrap(outmatFilterBitBig(bigmat, colIdx, state, cutoff));
     return rcpp_result_gen;
 END_RCPP
 }
 // outmatFilterIndel2
-std::vector<int> outmatFilterIndel2(IntegerMatrix mat, IntegerVector rowIdx, IntegerVector state, int cutoff);
-RcppExport SEXP _CasPhy_outmatFilterIndel2(SEXP matSEXP, SEXP rowIdxSEXP, SEXP stateSEXP, SEXP cutoffSEXP) {
+std::vector<int> outmatFilterIndel2(IntegerMatrix mat, IntegerVector colIdx, IntegerVector state, int cutoff);
+RcppExport SEXP _CasPhy_outmatFilterIndel2(SEXP matSEXP, SEXP colIdxSEXP, SEXP stateSEXP, SEXP cutoffSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< IntegerMatrix >::type mat(matSEXP);
-    Rcpp::traits::input_parameter< IntegerVector >::type rowIdx(rowIdxSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type colIdx(colIdxSEXP);
     Rcpp::traits::input_parameter< IntegerVector >::type state(stateSEXP);
     Rcpp::traits::input_parameter< int >::type cutoff(cutoffSEXP);
-    rcpp_result_gen = Rcpp::wrap(outmatFilterIndel2(mat, rowIdx, state, cutoff));
+    rcpp_result_gen = Rcpp::wrap(outmatFilterIndel2(mat, colIdx, state, cutoff));
+    return rcpp_result_gen;
+END_RCPP
+}
+// outmatFilterIndelBig
+std::vector<int> outmatFilterIndelBig(SEXP bigmat, IntegerVector colIdx, IntegerVector state, int cutoff);
+RcppExport SEXP _CasPhy_outmatFilterIndelBig(SEXP bigmatSEXP, SEXP colIdxSEXP, SEXP stateSEXP, SEXP cutoffSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type bigmat(bigmatSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type colIdx(colIdxSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type state(stateSEXP);
+    Rcpp::traits::input_parameter< int >::type cutoff(cutoffSEXP);
+    rcpp_result_gen = Rcpp::wrap(outmatFilterIndelBig(bigmat, colIdx, state, cutoff));
+    return rcpp_result_gen;
+END_RCPP
+}
+// subcols_bigmat
+IntegerMatrix subcols_bigmat(SEXP xp, Rcpp::IntegerVector cols);
+RcppExport SEXP _CasPhy_subcols_bigmat(SEXP xpSEXP, SEXP colsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type xp(xpSEXP);
+    Rcpp::traits::input_parameter< Rcpp::IntegerVector >::type cols(colsSEXP);
+    rcpp_result_gen = Rcpp::wrap(subcols_bigmat(xp, cols));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -1151,6 +1191,219 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// idx2weight
+IntegerVector idx2weight(IntegerVector idx, int len);
+RcppExport SEXP _CasPhy_idx2weight(SEXP idxSEXP, SEXP lenSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< IntegerVector >::type idx(idxSEXP);
+    Rcpp::traits::input_parameter< int >::type len(lenSEXP);
+    rcpp_result_gen = Rcpp::wrap(idx2weight(idx, len));
+    return rcpp_result_gen;
+END_RCPP
+}
+// calcDesStateBitReverse_AVX2
+Rcpp::IntegerVector calcDesStateBitReverse_AVX2(Rcpp::IntegerVector seq1, Rcpp::IntegerVector seq2, Rcpp::IntegerVector bistate2);
+RcppExport SEXP _CasPhy_calcDesStateBitReverse_AVX2(SEXP seq1SEXP, SEXP seq2SEXP, SEXP bistate2SEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Rcpp::IntegerVector >::type seq1(seq1SEXP);
+    Rcpp::traits::input_parameter< Rcpp::IntegerVector >::type seq2(seq2SEXP);
+    Rcpp::traits::input_parameter< Rcpp::IntegerVector >::type bistate2(bistate2SEXP);
+    rcpp_result_gen = Rcpp::wrap(calcDesStateBitReverse_AVX2(seq1, seq2, bistate2));
+    return rcpp_result_gen;
+END_RCPP
+}
+// ancestralBitReverse_AVX2
+Rcpp::List ancestralBitReverse_AVX2(IntegerMatrix mat, IntegerMatrix edge, int ntip, int nnode);
+RcppExport SEXP _CasPhy_ancestralBitReverse_AVX2(SEXP matSEXP, SEXP edgeSEXP, SEXP ntipSEXP, SEXP nnodeSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< IntegerMatrix >::type mat(matSEXP);
+    Rcpp::traits::input_parameter< IntegerMatrix >::type edge(edgeSEXP);
+    Rcpp::traits::input_parameter< int >::type ntip(ntipSEXP);
+    Rcpp::traits::input_parameter< int >::type nnode(nnodeSEXP);
+    rcpp_result_gen = Rcpp::wrap(ancestralBitReverse_AVX2(mat, edge, ntip, nnode));
+    return rcpp_result_gen;
+END_RCPP
+}
+// findMaxNested
+Rcpp::List findMaxNested(IntegerVector clade, IntegerMatrix edge, int ntip, int nnode);
+RcppExport SEXP _CasPhy_findMaxNested(SEXP cladeSEXP, SEXP edgeSEXP, SEXP ntipSEXP, SEXP nnodeSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< IntegerVector >::type clade(cladeSEXP);
+    Rcpp::traits::input_parameter< IntegerMatrix >::type edge(edgeSEXP);
+    Rcpp::traits::input_parameter< int >::type ntip(ntipSEXP);
+    Rcpp::traits::input_parameter< int >::type nnode(nnodeSEXP);
+    rcpp_result_gen = Rcpp::wrap(findMaxNested(clade, edge, ntip, nnode));
+    return rcpp_result_gen;
+END_RCPP
+}
+// approximateCompare
+Rcpp::List approximateCompare(SEXP bitClade, int ntip, IntegerMatrix edge1, IntegerMatrix edge2, int nnode2, int cacheSize, float threshold);
+RcppExport SEXP _CasPhy_approximateCompare(SEXP bitCladeSEXP, SEXP ntipSEXP, SEXP edge1SEXP, SEXP edge2SEXP, SEXP nnode2SEXP, SEXP cacheSizeSEXP, SEXP thresholdSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type bitClade(bitCladeSEXP);
+    Rcpp::traits::input_parameter< int >::type ntip(ntipSEXP);
+    Rcpp::traits::input_parameter< IntegerMatrix >::type edge1(edge1SEXP);
+    Rcpp::traits::input_parameter< IntegerMatrix >::type edge2(edge2SEXP);
+    Rcpp::traits::input_parameter< int >::type nnode2(nnode2SEXP);
+    Rcpp::traits::input_parameter< int >::type cacheSize(cacheSizeSEXP);
+    Rcpp::traits::input_parameter< float >::type threshold(thresholdSEXP);
+    rcpp_result_gen = Rcpp::wrap(approximateCompare(bitClade, ntip, edge1, edge2, nnode2, cacheSize, threshold));
+    return rcpp_result_gen;
+END_RCPP
+}
+// findMaxDes
+std::vector<int> findMaxDes(IntegerMatrix edge, int root, IntegerVector nodeState);
+RcppExport SEXP _CasPhy_findMaxDes(SEXP edgeSEXP, SEXP rootSEXP, SEXP nodeStateSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< IntegerMatrix >::type edge(edgeSEXP);
+    Rcpp::traits::input_parameter< int >::type root(rootSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type nodeState(nodeStateSEXP);
+    rcpp_result_gen = Rcpp::wrap(findMaxDes(edge, root, nodeState));
+    return rcpp_result_gen;
+END_RCPP
+}
+// qry2ref
+IntegerMatrix qry2ref(IntegerVector nodes, IntegerVector xorDis, int ntip, int nnode);
+RcppExport SEXP _CasPhy_qry2ref(SEXP nodesSEXP, SEXP xorDisSEXP, SEXP ntipSEXP, SEXP nnodeSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< IntegerVector >::type nodes(nodesSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type xorDis(xorDisSEXP);
+    Rcpp::traits::input_parameter< int >::type ntip(ntipSEXP);
+    Rcpp::traits::input_parameter< int >::type nnode(nnodeSEXP);
+    rcpp_result_gen = Rcpp::wrap(qry2ref(nodes, xorDis, ntip, nnode));
+    return rcpp_result_gen;
+END_RCPP
+}
+// collapseNode
+IntegerVector collapseNode(IntegerMatrix edge, IntegerVector nodeState, int ntip);
+RcppExport SEXP _CasPhy_collapseNode(SEXP edgeSEXP, SEXP nodeStateSEXP, SEXP ntipSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< IntegerMatrix >::type edge(edgeSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type nodeState(nodeStateSEXP);
+    Rcpp::traits::input_parameter< int >::type ntip(ntipSEXP);
+    rcpp_result_gen = Rcpp::wrap(collapseNode(edge, nodeState, ntip));
+    return rcpp_result_gen;
+END_RCPP
+}
+// removeNestedNode
+std::vector<int> removeNestedNode(IntegerMatrix edge, IntegerVector nodes, int size);
+RcppExport SEXP _CasPhy_removeNestedNode(SEXP edgeSEXP, SEXP nodesSEXP, SEXP sizeSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< IntegerMatrix >::type edge(edgeSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type nodes(nodesSEXP);
+    Rcpp::traits::input_parameter< int >::type size(sizeSEXP);
+    rcpp_result_gen = Rcpp::wrap(removeNestedNode(edge, nodes, size));
+    return rcpp_result_gen;
+END_RCPP
+}
+// buildNode
+std::vector<int> buildNode(IntegerMatrix edge, IntegerVector nodeSize, IntegerVector nodes, int ntip, float threshold);
+RcppExport SEXP _CasPhy_buildNode(SEXP edgeSEXP, SEXP nodeSizeSEXP, SEXP nodesSEXP, SEXP ntipSEXP, SEXP thresholdSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< IntegerMatrix >::type edge(edgeSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type nodeSize(nodeSizeSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type nodes(nodesSEXP);
+    Rcpp::traits::input_parameter< int >::type ntip(ntipSEXP);
+    Rcpp::traits::input_parameter< float >::type threshold(thresholdSEXP);
+    rcpp_result_gen = Rcpp::wrap(buildNode(edge, nodeSize, nodes, ntip, threshold));
+    return rcpp_result_gen;
+END_RCPP
+}
+// getDesIdx
+Rcpp::List getDesIdx(IntegerMatrix edge, int ntip, int nnode);
+RcppExport SEXP _CasPhy_getDesIdx(SEXP edgeSEXP, SEXP ntipSEXP, SEXP nnodeSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< IntegerMatrix >::type edge(edgeSEXP);
+    Rcpp::traits::input_parameter< int >::type ntip(ntipSEXP);
+    Rcpp::traits::input_parameter< int >::type nnode(nnodeSEXP);
+    rcpp_result_gen = Rcpp::wrap(getDesIdx(edge, ntip, nnode));
+    return rcpp_result_gen;
+END_RCPP
+}
+// getNodeDescendants
+IntegerVector getNodeDescendants(List desResult, int ntip, int node);
+RcppExport SEXP _CasPhy_getNodeDescendants(SEXP desResultSEXP, SEXP ntipSEXP, SEXP nodeSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< List >::type desResult(desResultSEXP);
+    Rcpp::traits::input_parameter< int >::type ntip(ntipSEXP);
+    Rcpp::traits::input_parameter< int >::type node(nodeSEXP);
+    rcpp_result_gen = Rcpp::wrap(getNodeDescendants(desResult, ntip, node));
+    return rcpp_result_gen;
+END_RCPP
+}
+// approximateCompare2
+Rcpp::List approximateCompare2(SEXP bitClade, int ntip, IntegerMatrix edge1, IntegerMatrix edge2, int nnode2, int cacheSize, float threshold);
+RcppExport SEXP _CasPhy_approximateCompare2(SEXP bitCladeSEXP, SEXP ntipSEXP, SEXP edge1SEXP, SEXP edge2SEXP, SEXP nnode2SEXP, SEXP cacheSizeSEXP, SEXP thresholdSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type bitClade(bitCladeSEXP);
+    Rcpp::traits::input_parameter< int >::type ntip(ntipSEXP);
+    Rcpp::traits::input_parameter< IntegerMatrix >::type edge1(edge1SEXP);
+    Rcpp::traits::input_parameter< IntegerMatrix >::type edge2(edge2SEXP);
+    Rcpp::traits::input_parameter< int >::type nnode2(nnode2SEXP);
+    Rcpp::traits::input_parameter< int >::type cacheSize(cacheSizeSEXP);
+    Rcpp::traits::input_parameter< float >::type threshold(thresholdSEXP);
+    rcpp_result_gen = Rcpp::wrap(approximateCompare2(bitClade, ntip, edge1, edge2, nnode2, cacheSize, threshold));
+    return rcpp_result_gen;
+END_RCPP
+}
+// approximateCompare2_AVX2
+Rcpp::List approximateCompare2_AVX2(SEXP bitClade, int ntip, IntegerMatrix edge1, IntegerMatrix edge2, int nnode2, int cacheSize, float threshold);
+RcppExport SEXP _CasPhy_approximateCompare2_AVX2(SEXP bitCladeSEXP, SEXP ntipSEXP, SEXP edge1SEXP, SEXP edge2SEXP, SEXP nnode2SEXP, SEXP cacheSizeSEXP, SEXP thresholdSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type bitClade(bitCladeSEXP);
+    Rcpp::traits::input_parameter< int >::type ntip(ntipSEXP);
+    Rcpp::traits::input_parameter< IntegerMatrix >::type edge1(edge1SEXP);
+    Rcpp::traits::input_parameter< IntegerMatrix >::type edge2(edge2SEXP);
+    Rcpp::traits::input_parameter< int >::type nnode2(nnode2SEXP);
+    Rcpp::traits::input_parameter< int >::type cacheSize(cacheSizeSEXP);
+    Rcpp::traits::input_parameter< float >::type threshold(thresholdSEXP);
+    rcpp_result_gen = Rcpp::wrap(approximateCompare2_AVX2(bitClade, ntip, edge1, edge2, nnode2, cacheSize, threshold));
+    return rcpp_result_gen;
+END_RCPP
+}
+// findClone
+std::vector<int> findClone(IntegerMatrix& edge, int ntip, int nnode, NumericVector& bs, double threshold);
+RcppExport SEXP _CasPhy_findClone(SEXP edgeSEXP, SEXP ntipSEXP, SEXP nnodeSEXP, SEXP bsSEXP, SEXP thresholdSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< IntegerMatrix& >::type edge(edgeSEXP);
+    Rcpp::traits::input_parameter< int >::type ntip(ntipSEXP);
+    Rcpp::traits::input_parameter< int >::type nnode(nnodeSEXP);
+    Rcpp::traits::input_parameter< NumericVector& >::type bs(bsSEXP);
+    Rcpp::traits::input_parameter< double >::type threshold(thresholdSEXP);
+    rcpp_result_gen = Rcpp::wrap(findClone(edge, ntip, nnode, bs, threshold));
+    return rcpp_result_gen;
+END_RCPP
+}
 
 static const R_CallMethodDef CallEntries[] = {
     {"_CasPhy_mutationNested", (DL_FUNC) &_CasPhy_mutationNested, 2},
@@ -1208,7 +1461,10 @@ static const R_CallMethodDef CallEntries[] = {
     {"_CasPhy_tipMergeSub", (DL_FUNC) &_CasPhy_tipMergeSub, 7},
     {"_CasPhy_combineTransition", (DL_FUNC) &_CasPhy_combineTransition, 2},
     {"_CasPhy_outmatFilterBit2", (DL_FUNC) &_CasPhy_outmatFilterBit2, 4},
+    {"_CasPhy_outmatFilterBitBig", (DL_FUNC) &_CasPhy_outmatFilterBitBig, 4},
     {"_CasPhy_outmatFilterIndel2", (DL_FUNC) &_CasPhy_outmatFilterIndel2, 4},
+    {"_CasPhy_outmatFilterIndelBig", (DL_FUNC) &_CasPhy_outmatFilterIndelBig, 4},
+    {"_CasPhy_subcols_bigmat", (DL_FUNC) &_CasPhy_subcols_bigmat, 2},
     {"_CasPhy_selectedNodeDes", (DL_FUNC) &_CasPhy_selectedNodeDes, 5},
     {"_CasPhy_bitAncestralEC", (DL_FUNC) &_CasPhy_bitAncestralEC, 6},
     {"_CasPhy_charAncestralEC", (DL_FUNC) &_CasPhy_charAncestralEC, 6},
@@ -1237,6 +1493,21 @@ static const R_CallMethodDef CallEntries[] = {
     {"_CasPhy_getEdgeState", (DL_FUNC) &_CasPhy_getEdgeState, 3},
     {"_CasPhy_locusOR", (DL_FUNC) &_CasPhy_locusOR, 2},
     {"_CasPhy_zipMat", (DL_FUNC) &_CasPhy_zipMat, 1},
+    {"_CasPhy_idx2weight", (DL_FUNC) &_CasPhy_idx2weight, 2},
+    {"_CasPhy_calcDesStateBitReverse_AVX2", (DL_FUNC) &_CasPhy_calcDesStateBitReverse_AVX2, 3},
+    {"_CasPhy_ancestralBitReverse_AVX2", (DL_FUNC) &_CasPhy_ancestralBitReverse_AVX2, 4},
+    {"_CasPhy_findMaxNested", (DL_FUNC) &_CasPhy_findMaxNested, 4},
+    {"_CasPhy_approximateCompare", (DL_FUNC) &_CasPhy_approximateCompare, 7},
+    {"_CasPhy_findMaxDes", (DL_FUNC) &_CasPhy_findMaxDes, 3},
+    {"_CasPhy_qry2ref", (DL_FUNC) &_CasPhy_qry2ref, 4},
+    {"_CasPhy_collapseNode", (DL_FUNC) &_CasPhy_collapseNode, 3},
+    {"_CasPhy_removeNestedNode", (DL_FUNC) &_CasPhy_removeNestedNode, 3},
+    {"_CasPhy_buildNode", (DL_FUNC) &_CasPhy_buildNode, 5},
+    {"_CasPhy_getDesIdx", (DL_FUNC) &_CasPhy_getDesIdx, 3},
+    {"_CasPhy_getNodeDescendants", (DL_FUNC) &_CasPhy_getNodeDescendants, 3},
+    {"_CasPhy_approximateCompare2", (DL_FUNC) &_CasPhy_approximateCompare2, 7},
+    {"_CasPhy_approximateCompare2_AVX2", (DL_FUNC) &_CasPhy_approximateCompare2_AVX2, 7},
+    {"_CasPhy_findClone", (DL_FUNC) &_CasPhy_findClone, 5},
     {NULL, NULL, 0}
 };
 

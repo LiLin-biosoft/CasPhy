@@ -97,8 +97,8 @@ printB <- function(x) {
     invisible(.Call(`_CasPhy_printB`, x))
 }
 
-edge2vector <- function(edge, maxIdx) {
-    .Call(`_CasPhy_edge2vector`, edge, maxIdx)
+edge2vector <- function(edge, len) {
+    .Call(`_CasPhy_edge2vector`, edge, len)
 }
 
 findNeighborWeighted <- function(mat, maxChar, weight, n = 10L, p = 0.5, radius = 0, verbose = FALSE) {
@@ -161,7 +161,7 @@ radiusWeightedParallel <- function(i, mat, maxChar, weight, radius) {
     .Call(`_CasPhy_radiusWeightedParallel`, i, mat, maxChar, weight, radius)
 }
 
-bsCollapse <- function(edge, edgeLen, bs, threshold = 50) {
+bsCollapse <- function(edge, edgeLen, bs, threshold = 0.5) {
     .Call(`_CasPhy_bsCollapse`, edge, edgeLen, bs, threshold)
 }
 
@@ -217,12 +217,24 @@ combineTransition <- function(transition1, transition2) {
     .Call(`_CasPhy_combineTransition`, transition1, transition2)
 }
 
-outmatFilterBit2 <- function(mat, rowIdx, state, cutoff = 1L) {
-    .Call(`_CasPhy_outmatFilterBit2`, mat, rowIdx, state, cutoff)
+outmatFilterBit2 <- function(mat, colIdx, state, cutoff = 1L) {
+    .Call(`_CasPhy_outmatFilterBit2`, mat, colIdx, state, cutoff)
 }
 
-outmatFilterIndel2 <- function(mat, rowIdx, state, cutoff = 1L) {
-    .Call(`_CasPhy_outmatFilterIndel2`, mat, rowIdx, state, cutoff)
+outmatFilterBitBig <- function(bigmat, colIdx, state, cutoff = 1L) {
+    .Call(`_CasPhy_outmatFilterBitBig`, bigmat, colIdx, state, cutoff)
+}
+
+outmatFilterIndel2 <- function(mat, colIdx, state, cutoff = 1L) {
+    .Call(`_CasPhy_outmatFilterIndel2`, mat, colIdx, state, cutoff)
+}
+
+outmatFilterIndelBig <- function(bigmat, colIdx, state, cutoff = 1L) {
+    .Call(`_CasPhy_outmatFilterIndelBig`, bigmat, colIdx, state, cutoff)
+}
+
+subcols_bigmat <- function(xp, cols) {
+    .Call(`_CasPhy_subcols_bigmat`, xp, cols)
 }
 
 selectedNodeDes <- function(edge, nnode, ntip, node, cacheSize = 8192L) {
@@ -233,7 +245,7 @@ bitAncestralEC <- function(mat, edge, tipSize, nnode, minSize = 10, minRatio = 2
     .Call(`_CasPhy_bitAncestralEC`, mat, edge, tipSize, nnode, minSize, minRatio)
 }
 
-charAncestralEC <- function(mat, edge, tipSize, nnode, minSize = 10, minRatio = 2) {
+charAncestralEC <- function(mat, edge, tipSize, nnode, minSize = 0, minRatio = 0) {
     .Call(`_CasPhy_charAncestralEC`, mat, edge, tipSize, nnode, minSize, minRatio)
 }
 
@@ -335,5 +347,65 @@ locusOR <- function(ve1, ve2) {
 
 zipMat <- function(ve) {
     .Call(`_CasPhy_zipMat`, ve)
+}
+
+idx2weight <- function(idx, len) {
+    .Call(`_CasPhy_idx2weight`, idx, len)
+}
+
+calcDesStateBitReverse_AVX2 <- function(seq1, seq2, bistate2) {
+    .Call(`_CasPhy_calcDesStateBitReverse_AVX2`, seq1, seq2, bistate2)
+}
+
+ancestralBitReverse_AVX2 <- function(mat, edge, ntip, nnode) {
+    .Call(`_CasPhy_ancestralBitReverse_AVX2`, mat, edge, ntip, nnode)
+}
+
+findMaxNested <- function(clade, edge, ntip, nnode) {
+    .Call(`_CasPhy_findMaxNested`, clade, edge, ntip, nnode)
+}
+
+approximateCompare <- function(bitClade, ntip, edge1, edge2, nnode2, cacheSize = 8192L, threshold = 0.1) {
+    .Call(`_CasPhy_approximateCompare`, bitClade, ntip, edge1, edge2, nnode2, cacheSize, threshold)
+}
+
+findMaxDes <- function(edge, root, nodeState) {
+    .Call(`_CasPhy_findMaxDes`, edge, root, nodeState)
+}
+
+qry2ref <- function(nodes, xorDis, ntip, nnode) {
+    .Call(`_CasPhy_qry2ref`, nodes, xorDis, ntip, nnode)
+}
+
+collapseNode <- function(edge, nodeState, ntip) {
+    .Call(`_CasPhy_collapseNode`, edge, nodeState, ntip)
+}
+
+removeNestedNode <- function(edge, nodes, size) {
+    .Call(`_CasPhy_removeNestedNode`, edge, nodes, size)
+}
+
+buildNode <- function(edge, nodeSize, nodes, ntip, threshold = 0.1) {
+    .Call(`_CasPhy_buildNode`, edge, nodeSize, nodes, ntip, threshold)
+}
+
+getDesIdx <- function(edge, ntip, nnode) {
+    .Call(`_CasPhy_getDesIdx`, edge, ntip, nnode)
+}
+
+getNodeDescendants <- function(desResult, ntip, node) {
+    .Call(`_CasPhy_getNodeDescendants`, desResult, ntip, node)
+}
+
+approximateCompare2 <- function(bitClade, ntip, edge1, edge2, nnode2, cacheSize = 8192L, threshold = 0.1) {
+    .Call(`_CasPhy_approximateCompare2`, bitClade, ntip, edge1, edge2, nnode2, cacheSize, threshold)
+}
+
+approximateCompare2_AVX2 <- function(bitClade, ntip, edge1, edge2, nnode2, cacheSize = 8192L, threshold = 0.1) {
+    .Call(`_CasPhy_approximateCompare2_AVX2`, bitClade, ntip, edge1, edge2, nnode2, cacheSize, threshold)
+}
+
+findClone <- function(edge, ntip, nnode, bs, threshold) {
+    .Call(`_CasPhy_findClone`, edge, ntip, nnode, bs, threshold)
 }
 

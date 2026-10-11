@@ -82,7 +82,7 @@ mat2bit<-function(mat,code_unmutated=F,return.bit=T){
   }
 }
 
-regularize.split<-function(x,min_size=0){
+regularize.split<-function(x,min_size=10){
   category<-unique(x)
   x<-factor(x,levels=category)
   levels(x)<-match(1:nlevels(x),order(table(x),decreasing=T))
@@ -97,17 +97,17 @@ regularize.split<-function(x,min_size=0){
 #' The top solver that splits the data into small clusters
 #'
 #' @param mat The mutation matrix.
-#' @param bit_coded Whether the matrix is bit coded.
-#' @param weight Weights of sites.
+#' @param weight Weights of indels.
 #' @param splt The results of `split.data` from previous run.
 #' @param split_idx The index of cluster to further split.
 #' @param radius The minimum number of mutations between neighbors.
 #' @param p_shared The threshold for the percentage of shared neighbors.
 #' @param min_size The minimum size of clusters. Clusters smaller than this value will be collapsed.
+#' @param batch_size The batch size during processing. Batch size has no effect on the results.
 #' @param file_backed The name of backup file. If set to `NULL`, do not create backup file. If set to `""`, create an anonymous backup file.
 #' @param ncore The number of threads used.
-#' @param cuda_path The path of CUDA script. If set to `NULL`, do not use CUDA.
 #' @param verbose Whether print detailed information.
+#' 
 #' 
 #' @examples
 #' \dontrun{
@@ -117,7 +117,7 @@ regularize.split<-function(x,min_size=0){
 #' @return Return an integer matrix containing the cluster information.
 
 split.data<-function(mat,bit_coded=F,weight=NULL,splt=NULL,splt_idx=1,
-                     radius=25,p_shared=0.8,min_size=10,
+                     radius=0,p_shared=0.8,min_size=10,
                      file_backed=NULL,ncore=1,cuda_path=NULL,verbose=F){
   batch_size<-1e4
   if(!bit_coded){
@@ -432,18 +432,6 @@ node.ancestral<-function(phy,mat){
   return(output[1:phy$Nnode+length(phy$tip.label),])
 }
 
-#' relabel the indels.
-#'
-#' @param mat The input matrix.
-#' @param ref the reference matrix containg all indels.
-#' 
-#' @examples
-#' \dontrun{
-#' mat<-regularize.mat(mat,mat)
-#'}
-#'
-#' @return an integer matrix.
-
 regularize.mat<-function(mat,ref){
   for(i in 1:ncol(mat)){
     tmp<-sort(unique(c(ref[,i],-1L,0L)))
@@ -451,14 +439,6 @@ regularize.mat<-function(mat,ref){
   }
   return(mat)
 }
-
-# regularize.mat<-function(mat,ref){
-#   for(i in 1:ncol(mat)){
-#     tmp<-sort(unique(c(ref[,i],-1,0)))
-#     mat[,i]<-match(mat[,i],tmp)-2
-#   }
-#   return(mat)
-# }
 
 greedy.wrap<-function(mat,weight=NULL,noise=F,collapse=F,file_backed=NULL,verbose=F){
   if(is.null(weight)){
@@ -563,8 +543,8 @@ greedy.partial<-function(inmat,outmat=NULL,keep_cutoff=1,weight=NULL,noise=F,col
 #' phylogeny reconstruction using shared-mutation-join algorithm
 #'
 #' @param mat The mutation matrix.
-#' @param bit_coded Whether the matrix is bit coded.
 #' @param weight Weights of indels.
+#' @param noise Whether add some noise to the weights to prevent equal number of shared mutations.
 #' 
 #' @examples
 #' \dontrun{
@@ -573,21 +553,73 @@ greedy.partial<-function(inmat,outmat=NULL,keep_cutoff=1,weight=NULL,noise=F,col
 #'
 #' @return a reconstructed phylogeny.
 
-shared.mutation.join<-function(mat,bit_coded=F,weight=NULL){
+# shared.mutation.join<-function(mat,bit_coded=F,weight=NULL){
+#   if(bit_coded){
+#     if(is.null(weight)){
+#       weight<-rep(1,ncol(mat)*32)
+#     }
+#   }else{
+#     mat<-regularize.mat(mat,mat)
+#     if(is.null(weight)){
+#       tmp<-mat2bit(mat,return.bit=F)
+#       weight<-matrix(1,max(diff(tmp$loci)),ncol(mat))
+#       rm(tmp)
+#     }
+#   }
+#   phy<-phy.join(inmat=t(mat),bit_coded=bit_coded,weight=weight)
+#   return(phy$phy)
+# }
+
+shared.mutation.join<-function(mat,bit_coded,weight,prefix="./",cuda_path=NULL){
   if(bit_coded){
     if(is.null(weight)){
-      weight<-rep(1,ncol(mat)*32)
+      w<-rep(1,ncol(mat)*32)
+    }else{
+      w<-weight
     }
   }else{
     mat<-regularize.mat(mat,mat)
     if(is.null(weight)){
       tmp<-mat2bit(mat,return.bit=F)
-      weight<-matrix(1,max(diff(tmp$loci)),ncol(mat))
+      w<-matrix(1,max(diff(tmp$loci)),ncol(mat))
       rm(tmp)
+    }else{
+      w<-weight
     }
   }
-  phy<-phy.join(inmat=t(mat),bit_coded=bit_coded,weight=weight)
-  return(phy$phy)
+  mat<-t(mat)
+  if(is.null(colnames(mat))){
+    colnames(mat)<-paste0("C",1:ncol(mat))
+  }
+  if(is.null(cuda_path)){
+    phyData<-phy.join(
+      inmat=mat,
+      bit_coded=bit_coded,
+      weight=w,
+      ancestralType=1
+    )
+    phy<-phyData$phy
+  }else{
+    wfile<-paste0(prefix,".w",sep="")
+    if(bit_coded){
+      writeBin(as.numeric(w),con=wfile)
+      write.mat2bin(mat,file=paste0(prefix,".tbmat",sep=""))
+      system(paste0(cuda_path,"joinEdgeBitReverse ",prefix," ",wfile," ",1))
+    }else{
+      writeBin(as.numeric(t(w)),con=wfile)
+      write.mat2bin(mat+1L,file=paste0(prefix,".tbmat",sep=""))
+      write.mat2bin(matrix(rep(1L,ncol(mat)),,1),file=paste0(prefix,".tipSize",sep=""))
+      system(paste0(cuda_path,"joinEdgeIndel ",prefix," ",wfile," ",nrow(w)," ",0," ",2))
+      unlink(paste0(prefix,".tipSize",sep=""))
+    }
+    unlink(paste0(prefix,".tbmat"))
+    unlink(wfile)
+    edge<-read.bin2mat(paste0(prefix,".edge2"))
+    unlink(paste0(prefix,".edge2"))
+    unlink(paste0(prefix,".nodeState2"))
+    phy<-edge2phy(edge,colnames(mat))
+  }
+  return(phy)
 }
 
 h.join<-function(mat,splt,weight=NULL,collapse=F,verbose=F){
@@ -619,21 +651,21 @@ h.join<-function(mat,splt,weight=NULL,collapse=F,verbose=F){
 #' 
 #' @examples
 #' \dontrun{
-#' tre<-link.hcluster(phys)
+#' tre<-as.ultrametric(phys)
 #'}
 #'
 #' @return a phylogeny.
 
-# link.hcluster<-function(mg){
-#   output<-mg[["__M1"]]
-#   while(length(grep("^__M",output$tip.label))!=0){
-#     tip_idx<-grep("^__M",output$tip.label)[1]
-#     output<-bind.tree(output,mg[[output$tip.label[tip_idx]]],where=tip_idx)
-#   }
-#   return(output)
-# }
+link.hcluster<-function(mg){
+  output<-mg[["__M1"]]
+  while(length(grep("^__M",output$tip.label))!=0){
+    tip_idx<-grep("^__M",output$tip.label)[1]
+    output<-bind.tree(output,mg[[output$tip.label[tip_idx]]],where=tip_idx)
+  }
+  return(output)
+}
 
-link.hcluster<-function(phys){
+link.hcluster2<-function(phys){
   tre<-phys[["__M1"]]
   while(length(grep("__M",tre$tip.label))>0){
     linkIdx<-grep("__M",tre$tip.label)
@@ -755,433 +787,12 @@ nodes.break<-function(phy,nodes_state){
   return(output)
 }
 
-gen.mat<-function(mat,splt,bit_coded=F,return.mat=T){
-  mg_idx<-setdiff(unique(splt),0)
-  if(length(mg_idx)==0){
-    submat_idx<-1:nrow(mat)
-    if(return.mat){
-      return(list(submat=mat,idx=submat_idx,splt=rep(0,nrow(mat))))
-    }else{
-      return(list(submat=NULL,idx=submat_idx,splt=rep(0,nrow(mat))))
-    }
-  }else{
-    if(return.mat){
-      if(bit_coded){
-        output<-rbind(
-          output<-mat[splt==0,],
-          t(sapply(mg_idx,function(x){
-            bitAncestral(matrix(mat[splt==x,],,ncol(mat)))
-          }))
-        )
-      }else{
-        output<-rbind(
-          output<-mat[splt==0,],
-          t(sapply(mg_idx,function(x){
-            charAncestral(matrix(mat[splt==x,],,ncol(mat)))
-          }))
-        )
-      }
-      rownames(output)<-c(rownames(mat)[splt==0],paste0("__M",mg_idx))
-    }
-    offset<-sum(splt==0)
-    submat_idx<-sapply(splt,function(x){
-      if(x==0) return(0)
-      else return(match(x,mg_idx)+offset)
-    })
-    submat_idx[submat_idx==0]<-1:offset
-    if(return.mat){
-      return(list(submat=output,idx=submat_idx,splt=c(rep(0,sum(splt==0)),mg_idx)))
-    }else{
-      return(list(submat=NULL,idx=submat_idx,splt=c(rep(0,sum(splt==0)),mg_idx)))
-    }
-  }
-}
-
-gen.mat2<-function(mat,ansMat=NULL,splt,bit_coded=F,return.mat=T){
-  ## col:tip row:feature
-  mg_idx<-setdiff(unique(splt),0)
-  if(length(mg_idx)==0){
-    submat_idx<-1:ncol(mat)
-    if(return.mat){
-      return(list(submat=mat,idx=submat_idx,splt=rep(0,ncol(mat))))
-    }else{
-      return(list(submat=NULL,idx=submat_idx,splt=rep(0,ncol(mat))))
-    }
-  }else{
-    if(return.mat){
-      output<-cbind(
-        output<-mat[,splt==0],
-        ansMat[,paste0("__M",mg_idx)]
-      )
-      colnames(output)<-c(colnames(mat)[splt==0],paste0("__M",mg_idx))
-    }
-    offset<-sum(splt==0)
-    submat_idx<-sapply(splt,function(x){
-      if(x==0) return(0)
-      else return(match(x,mg_idx)+offset)
-    })
-    submat_idx[submat_idx==0]<-1:offset
-    if(return.mat){
-      return(list(submat=output,idx=submat_idx,splt=c(rep(0,sum(splt==0)),mg_idx)))
-    }else{
-      return(list(submat=NULL,idx=submat_idx,splt=c(rep(0,sum(splt==0)),mg_idx)))
-    }
-  }
-}
-
-gen.mat3<-function(mat,inIdx,ansMat=NULL,splt,return.mat=T){
-  ##row:tip col:feature
-  mg_idx<-setdiff(unique(splt),0)
-  if(length(mg_idx)==0){
-    submat_idx<-1:length(inIdx)
-    if(return.mat){
-      return(list(submat=mat[inIdx,],idx=submat_idx,splt=rep(0,length(inIdx))))
-    }else{
-      return(list(submat=NULL,idx=submat_idx,splt=rep(0,length(inIdx))))
-    }
-  }else{
-    if(return.mat){
-      output<-rbind(
-        output<-mat[inIdx[splt==0],],
-        ansMat[paste0("__M",mg_idx),]
-      )
-      rownames(output)<-c(rownames(mat)[inIdx][splt==0],paste0("__M",mg_idx))
-    }
-    offset<-sum(splt==0)
-    submat_idx<-sapply(splt,function(x){
-      if(x==0) return(0)
-      else return(match(x,mg_idx)+offset)
-    })
-    submat_idx[submat_idx==0]<-1:offset
-    if(return.mat){
-      return(list(submat=output,idx=submat_idx,splt=c(rep(0,sum(splt==0)),mg_idx)))
-    }else{
-      return(list(submat=NULL,idx=submat_idx,splt=c(rep(0,sum(splt==0)),mg_idx)))
-    }
-  }
-}
-
-
-#' reconstruct the phylogenies using partial join algorithm
-#'
-#' @param mat The mutation matrix.
-#' @param splt Split of data from `split.data`.
-#' @param keep_cutoff The cutoff to break problematic clades.
-#' @param weight Weights of indels.
-#' @param bit_coded Whether the matrix is bit coded.
-#' @param prefix The prefix of temporary file.
-#' @param cuda_path The path of CUDA script. If set to `NULL`, do not use CUDA.
-#' @param cuda_threshold Cluster larger than this value will be accelerated by CUDA.
-#' @param ncore The number of cores used.
-#' @param verbose Whether print detailed information.
-#' 
-#' @examples
-#' \dontrun{
-#' phys<-h.partial.join(imputed,splt,noise=F,verbose=F)
-#'}
-#'
-#' @return a list of phylogenies.
-
-h.partial.join<-function(
-    mat,splt,bit_coded=F,keep_cutoff=1,weight=NULL,
-    prefix="./",cuda_path=NULL,cuda_threshold=500,
-    ncore=1,verbose=T
-){
-  ancestralType=1
-  sizeOfTips=rep(1,nrow(mat))
-  minSize=0
-  minRatio=2
-  
-  partial.join<-function(j){
-    inIdx<-which(splt[,layer]==j)
-    outIdx<-which(splt[,layer]!=j)
-    inmat<-gen.mat3(mat,inIdx,ansMat,splt[inIdx,layer+1])
-    tip2pseudo<-inmat$idx
-    if(!bit_coded){
-      tipSize<-sapply(1:nrow(inmat$submat),function(x){
-        sum(sizeOfTips[inIdx][tip2pseudo==x])
-      })
-      tipSize<-as.integer(tipSize)
-      # tipSize<-calPseudoSize(sizeOfTips[inIdx],tip2pseudo,nrow(inmat$submat))
-    }
-    inmat<-t(inmat$submat)
-    tipLabel<-colnames(inmat)
-    
-    ##using CUDA to join or not
-    if(ncol(inmat)<cuda_threshold||is.null(cuda_path)){
-      phyData<-phy.join(
-        inmat=inmat,
-        bit_coded=bit_coded,
-        weight=w,
-        ancestralType=ancestralType,
-        tipSize=tipSize,
-        minSize=minSize,
-        minRatio=minRatio
-      )
-      rm(inmat)
-      phy<-phyData$phy
-      node_mat<-phyData$node_mat
-      rm(phyData)
-      if(length(outIdx)==0){
-        return(list(phys=list(phy),category=rep(1,length(inIdx)),ansState=node_mat[,1],isbroken=F))
-      }
-      
-      tmpSplt<-splt[outIdx,layer+1]
-      idx1<-outIdx[tmpSplt==0]
-      mgIdx<-setdiff(unique(tmpSplt),0)
-      if(length(mgIdx)>0){
-        idx2<-match(paste0("__M",setdiff(unique(tmpSplt),0)),rownames(ansMat))
-      }else{
-        idx2<-integer()
-      }
-      if(bit_coded){
-        idx1f<-outmatFilterBit2(mat,idx1-1L,node_mat[,1],cutoff=keep_cutoff)+1L
-        idx2f<-outmatFilterBit2(ansMat,idx2-1L,node_mat[,1],cutoff=keep_cutoff)+1L
-      }else{
-        idx1f<-outmatFilterIndel2(mat,idx1-1L,node_mat[,1],cutoff=keep_cutoff)+1L
-        idx2f<-outmatFilterIndel2(ansMat,idx2-1L,node_mat[,1],cutoff=keep_cutoff)+1L
-      }
-      if(length(idx1f)+length(idx2f)==0){
-        return(list(phys=list(phy),category=rep(1,length(inIdx)),ansState=node_mat[,1],isbroken=F))
-      }else{
-        outmat<-t(rbind(mat[idx1f,],ansMat[idx2f,]))
-      }
-      
-      if(bit_coded){
-        ## the results are copied from edge, the idx of thy$edge is 1-based, no need to plus one
-        nodes_retain<-nodeKeepBit2(
-          edge=phy$edge,
-          Ntip=Ntip(phy),
-          node_mat=node_mat,
-          outmat=outmat,
-          keep_cutoff=keep_cutoff
-        )
-      }else{
-        nodes_retain<-nodeKeepIndel(
-          edge=phy$edge,
-          Ntip=Ntip(phy),
-          node_mat=node_mat,
-          outmat=outmat,
-          keep_cutoff=keep_cutoff
-        )
-      }
-      rm(outmat)
-      nodes_retain<-sort(nodes_retain[nodes_retain>Ntip(phy)])
-      node_mat<-t(node_mat[,nodes_retain-Ntip(phy)])
-      gc()
-    }else{
-      if(bit_coded){
-        write.mat2bin(inmat,file=paste0(prefix,"__M",j,".tbmat",sep=""))
-        rm(inmat)
-        system(paste0(cuda_path,"joinEdgeBitReverse ",prefix,"__M",j," ",wfile," ",ancestralType))
-      }else{
-        write.mat2bin(inmat+1L,file=paste0(prefix,"__M",j,".tbmat",sep=""))
-        write.mat2bin(matrix(tipSize,,1),file=paste0(prefix,"__M",j,".tipSize",sep=""))
-        rm(inmat)
-        system(paste0(cuda_path,"joinEdgeIndel ",prefix,"__M",j," ",wfile," ",nrow(w)," ",minSize," ",minRatio))
-      }
-      unlink(paste0(prefix,"__M",j,".tbmat"))
-      unlink(paste0(prefix,"__M",j,".tipSize",sep=""))
-      edge<-read.bin2mat(paste0(prefix,"__M",j,".edge2"))
-      phy<-edge2phy(edge,tipLabel)
-      node_mat<-read.bin2mat(paste0(prefix,"__M",j,".nodeState2",sep=""))
-      if(!bit_coded){
-        node_mat<-node_mat-1L
-      }
-      if(length(outIdx)==0){
-        unlink(paste0(prefix,"__M",j,".edge2"))
-        unlink(paste0(prefix,"__M",j,".nodeState2"))
-        return(list(phys=list(phy),category=rep(1,length(inIdx)),ansState=node_mat[,1],isbroken=F))
-      }
-      
-      tmpSplt<-splt[outIdx,layer+1]
-      idx1<-outIdx[tmpSplt==0]
-      mgIdx<-setdiff(unique(tmpSplt),0)
-      if(length(mgIdx)>0){
-        idx2<-match(paste0("__M",setdiff(unique(tmpSplt),0)),rownames(ansMat))
-      }else{
-        idx2<-integer()
-      }
-      if(bit_coded){
-        idx1f<-outmatFilterBit2(mat,idx1-1L,node_mat[,1],cutoff=keep_cutoff)+1L
-        idx2f<-outmatFilterBit2(ansMat,idx2-1L,node_mat[,1],cutoff=keep_cutoff)+1L
-      }else{
-        idx1f<-outmatFilterIndel2(mat,idx1-1L,node_mat[,1],cutoff=keep_cutoff)+1L
-        idx2f<-outmatFilterIndel2(ansMat,idx2-1L,node_mat[,1],cutoff=keep_cutoff)+1L
-      }
-      if(length(idx1f)+length(idx2f)==0){
-        unlink(paste0(prefix,"__M",j,".edge2"))
-        unlink(paste0(prefix,"__M",j,".nodeState2"))
-        return(list(phys=list(phy),category=rep(1,length(inIdx)),ansState=node_mat[,1],isbroken=F))
-      }else{
-        outmat<-t(rbind(mat[idx1f,],ansMat[idx2f,]))
-      }
-      
-      ########using CUDA to break phy or not
-      if(ncol(outmat)<128){
-        unlink(paste0(prefix,"__M",j,".edge2"))
-        unlink(paste0(prefix,"__M",j,".nodeState2"))
-        if(bit_coded){
-          ## the results are copied from edge, the idx of thy$edge is 1-based, no need to plus one
-          nodes_retain<-nodeKeepBit2(
-            edge=phy$edge,
-            Ntip=Ntip(phy),
-            node_mat=node_mat,
-            outmat=outmat,
-            keep_cutoff=keep_cutoff
-          )
-        }else{
-          nodes_retain<-nodeKeepIndel(
-            edge=phy$edge,
-            Ntip=Ntip(phy),
-            node_mat=node_mat,
-            outmat=outmat,
-            keep_cutoff=keep_cutoff
-          )
-        }
-        rm(outmat)
-        nodes_retain<-sort(nodes_retain[nodes_retain>Ntip(phy)])
-        node_mat<-t(node_mat[,nodes_retain-Ntip(phy)])
-        gc()
-      }else{
-        if(bit_coded){
-          write.mat2bin(outmat,file=paste0(prefix,"__M",j,".tboutmat",sep=""))
-          rm(outmat)
-          system(paste0(cuda_path,"nodeKeepBit ",prefix,"__M",j," ",keep_cutoff))
-        }else{
-          write.mat2bin(outmat+1L,file=paste0(prefix,"__M",j,".tboutmat",sep=""))
-          rm(outmat)
-          system(paste0(cuda_path,"nodeKeepIndel ",prefix,"__M",j," ",keep_cutoff))
-        }
-        if(file.size(paste0(prefix,"__M",j,".retainNode"))==0){
-          nodes_retain<-integer()
-        }else{
-          nodes_retain<-read.table(file=paste0(prefix,"__M",j,".retainNode"))[,1]+1
-          nodes_retain<-sort(nodes_retain)
-        }
-        unlink(paste0(prefix,"__M",j,".edge2"))
-        unlink(paste0(prefix,"__M",j,".nodeState2"))
-        unlink(paste0(prefix,"__M",j,".tboutmat"))
-        unlink(paste0(prefix,"__M",j,".retainNode"))
-        node_mat<-t(node_mat[,nodes_retain-Ntip(phy)])
-        gc()
-      }
-    }
-    if(length(nodes_retain)==0){
-      return(list(phys=list(),category=rep(0,length(inIdx)),ansState=node_mat,isbroken=T,inIdx=inIdx))
-    }else{
-      tmp<-phy.break(phy,nodes_retain)
-      broken_phys<-tmp$phys
-      category<-tmp$category
-      return(list(phys=broken_phys,category=category[tip2pseudo],ansState=node_mat,isbroken=T,inIdx=inIdx))
-    }
-  }
-  wfile<-paste0(prefix,".w",sep="")
-  if(!bit_coded){
-    mat<-regularize.mat(mat,mat)
-    if(is.null(weight)){
-      tmp<-mat2bit(mat,return.bit=F)
-      w<-matrix(1,max(diff(tmp$loci)),ncol(mat))
-      rm(tmp)
-    }else{
-      w<-weight
-    }
-    writeBin(as.numeric(t(w)),con=wfile)
-  }else{
-    if(is.null(weight)){
-      w<-rep(1,ncol(mat)*32)
-    }else{
-      w<-weight
-    }
-    writeBin(as.numeric(w),con=wfile)
-  }
-  
-  splt<-cbind(splt,0)
-  max_mg_idx<-max(splt)
-  phys<-list()
-  ansMat<-matrix(integer(),0,ncol(mat))
-  for(layer in ncol(splt):2-1){
-    clustIdx<-setdiff(sort(unique(splt[,layer])),0)
-    set.seed(1)
-    if(length(clustIdx)>1){
-      clustIdx<-sample(clustIdx,length(clustIdx))
-    }
-    cat(as.character(Sys.time()),"solving layer ",layer,fill=T)
-    ncoreRun<-min(ncore,length(clustIdx))
-    if(ncoreRun>1){
-      cl<-makeForkCluster(ncoreRun)
-      partial_res_collected<-parLapply(cl,clustIdx,partial.join)
-      stopCluster(cl)
-    }else{
-      partial_res_collected<-list()
-      for(j in clustIdx){
-        partial_res_collected<-c(partial_res_collected,list(partial.join(j)))
-      }
-    }
-    cat(as.character(Sys.time()),"summerizing layer ",layer,fill=T)
-    nPhys<-sapply(partial_res_collected,function(x){
-      if(x$isbroken){
-        return(length(x$phys))
-      }else{
-        return(0)
-      }
-    })
-    offset<-diffinv(nPhys)+max_mg_idx
-    tmp<-unlist(lapply(1:length(clustIdx),function(i){
-      if(partial_res_collected[[i]]$isbroken){
-        if(nPhys[i]==0){
-          return(integer())
-        }else{
-          return(1:nPhys[i]+offset[i])
-        }
-      }else{
-        return(clustIdx[i])
-      }
-    }))
-    newPhys<-unlist(lapply(partial_res_collected,function(x) x$phys),recursive=F)
-    if(length(tmp)>0){
-      names(newPhys)<-paste0("__M",tmp)
-    }
-    phys<-c(phys,newPhys)
-    
-    newAnsMat<-lapply(partial_res_collected,function(x) t(x$ansState))
-    newAnsMat<-t(matrix(unlist(newAnsMat),ncol(mat),))
-    if(length(tmp)>0){
-      rownames(newAnsMat)<-paste0("__M",tmp)
-    }
-    ansMat<-rbind(ansMat,newAnsMat)
-    
-    replaceIdx<-unlist(lapply(partial_res_collected,function(x){
-      if(x$isbroken){
-        return(x$inIdx)
-      }else{
-        return(integer())
-      }
-    }))
-    new_group<-unlist(lapply(1:length(clustIdx),function(i){
-      if(partial_res_collected[[i]]$isbroken){
-        tmp<-partial_res_collected[[i]]$category
-        tmp[tmp!=0]<-tmp[tmp!=0]+offset[i]
-        return(tmp)
-      }else{
-        return(integer())
-      }
-    }))
-    temp<-splt[replaceIdx,layer+1]
-    temp[new_group>0]<-new_group[new_group>0]
-    splt[replaceIdx,layer]<-temp
-    max_mg_idx<-max(offset)
-    cat(as.character(Sys.time())," layer ",layer," finished",fill=T)
-  }
-  unlink(wfile)
-  return(phys)
-}
-
 #' calculate the number of evolution events of the phylogeny.
 #'
 #' @param phy The phylogeny object.
 #' @param mat The mutation matrix.
-#' @param bit_coded Whether the matrix is bit coded.
+#' @param weight Weights of indels.
+#' @param verbose Whether to print the number of evolution events.
 #' 
 #' @examples
 #' \dontrun{
@@ -1207,16 +818,15 @@ add.nEvo<-function(phy,nEvo,weight=NULL){
   return(phy)
 }
 
-#' add the length of edges to the phylogeny and collapse nodes without evolution.
+#' add the length of edges to the phylogeny according the number of evolution events and collapse nodes without evolution.
 #'
 #' @param phy The phylogeny object.
-#' @param mat The mutation matrix.
-#' @param bit_coded Whether the matrix is bit coded.
+#' @param nEvo The results from `cal.nevo`.
 #' @param collapse Whether to collapse the nodes. If set to False, the function just add the length of edges to the phylogeny.
 #' 
 #' @examples
 #' \dontrun{
-#' tre<-collapse.infoless(tre,mat)
+#' tre<-collapse.infoless(tre,nEvo)
 #'}
 #'
 #' @return a phylogeny.
@@ -1878,6 +1488,10 @@ iter.impute.packed<-function(mat,weight=NULL,n_neighbor=10:2,p_mutation=0.5,n_it
       cat("Impute ",temp," entries.",fill=T)
     }
     n_mask<-n_mask-temp
+    if(temp<max(cutoff,100)){
+      neighbor_idx<-neighbor_idx+1
+      reinitial<-reinitial+1
+    }
   }
   gc()
   while(k<n_iter&neighbor_idx<=length(n_neighbor)){
@@ -1918,7 +1532,7 @@ iter.impute.packed<-function(mat,weight=NULL,n_neighbor=10:2,p_mutation=0.5,n_it
       cat("Impute ",temp," entries.",fill=T)
     }
     n_mask<-n_mask-temp
-    if(temp<cutoff){
+    if(temp<max(cutoff,100)){
       neighbor_idx<-neighbor_idx+1
       reinitial<-reinitial+1
       if(reinitial>5){
@@ -1934,31 +1548,48 @@ iter.impute.packed<-function(mat,weight=NULL,n_neighbor=10:2,p_mutation=0.5,n_it
   return(mat)
 }
 
-write.mat2bin<-function(mat,file){
-  output<-rev(dim(mat))
-  output<-c(output,mat)
-  writeBin(object=output,con=file)
+write.mat2bin<-function (mat,file,extraCols=0L,chunk_size=1024L,append=0){
+  extraCols<-as.integer(extraCols)
+  if(append==0){
+    d<-as.integer(rev(dim(mat)))
+      con<-file(file,"wb")
+      writeBin(c(d[1]+extraCols,d[2]),con=con)
+      i<-0L
+      while (i<d[1]){
+        chunk_data<-as.vector(mat[,(1+i):min((chunk_size+i),d[1])])
+        writeBin(chunk_data,con=con)
+        i<-i+chunk_size
+      }
+      i<-0L
+      while(i<extraCols){
+        chunk_data<-rep(0L,min(chunk_size,extraCols-i)*d[2])
+        writeBin(chunk_data,con=con)
+        i<-i+chunk_size
+      }
+      close(con)
+  }else{
+    con<-file(file, "r+b")
+    seek(con,where=(2+append)*4,origin="start",rw="write")
+    if(class(mat)[1]=="big.matrix"){
+      i<-0L
+      while(i<ncol(mat)){
+        chunk_data<-as.vector(mat[,(1+i):min((chunk_size+i),ncol(mat))])
+        writeBin(chunk_data,con=con)
+        i<-i+chunk_size
+      }
+    }else{
+      writeBin(as.vector(mat),con)
+    }
+    close(con)
+  }
 }
-
-
-#' read packed matrix from bin file
-#'
-#' @param file The file name.
-#' @param chunk_size The chunk size used in reading.
-#' 
-#' @examples
-#' \dontrun{
-#' mat<-read.bin2mat(file="test.bin")
-#'}
-#'
-#' @return an bit coded matrix containing the mutation profiles.
 
 read.bin2mat<-function(file,chunk_size=32768L){
   con<-file(file,"rb")
   d <- readBin(con = con, what = "integer", n = 2)
   if(log2(d[1])+log2(d[2])<31){
-    mat <- readBin(con = con, what = "integer", n = d[1] * 
-                     d[2] + 2)
+    mat <- readBin(con = con, what = "integer", n = d[1] *
+                     d[2])
     mat <- matrix(mat, d[2], d[1])
   }else{
     mat<-matrix(integer(),d[2],d[1])
@@ -1973,9 +1604,17 @@ read.bin2mat<-function(file,chunk_size=32768L){
   return(mat)
 }
 
-bs.collapse<-function(tre,bs,threshold=50){
+# bs.collapse<-function(tre,bs,threshold=50){
+#   len<-bsCollapse(tre$edge,tre$edge.length,bs,threshold)
+#   tre$edge.length<-len
+#   tre<-di2multi(tre)
+#   return(tre)
+# }
+
+bs.collapse<-function(tre,bs,threshold=0.5){
   len<-bsCollapse(tre$edge,tre$edge.length,bs,threshold)
   tre$edge.length<-len
+  tre$node.label<-as.character(c(0,bs))
   tre<-di2multi(tre)
   return(tre)
 }
@@ -2064,33 +1703,12 @@ member.combine<-function(subMember){
   }))
 }
 
-#' The top solver that splits the DNA sequence data into small clusters
-#'
-#' @param mat The mutation matrix.
-#' @param splt The result from previous run.
-#' @param split_idx The index of cluster to further split.
-#' @param radius The minimum number of mutations between neighbors.
-#' @param p_shared The threshold for the percentage of shared neighbors.
-#' @param min_size The minimum size of clusters. Clusters smaller than this value will be collapsed.
-#' @param file_backed The name of backup file. If set to `NULL`, do not create backup file. If set to `""`, create an anonymous backup file.
-#' @param ncore The number of threads used.
-#' @param cuda_path The path of CUDA script. If set to `NULL`, do not use CUDA.
-#' @param verbose Whether print detailed information.
-#' 
-#' 
-#' @examples
-#' \dontrun{
-#' splt<-split.data.DNA(mat,radius=1000,p_shared=0.8)
-#'}
-#'
-#' @return Return an integer matrix containing the cluster information.
 
-split.data.DNA<-function(mat,splt=NULL,splt_idx=1,
+split.data.DNA<-function(mat,weight=NULL,splt=NULL,splt_idx=1,
                          radius=100,p_shared=0.8,min_size=10,
                          file_backed=NULL,ncore=1,cuda_path=NULL,verbose=F){
   batch_size=1e4
   weight<-rep(1,nrow(mat)*4)
-
   if(is.null(splt)){
     layer<-1
     k<-1
@@ -2283,113 +1901,12 @@ split.data.DNA<-function(mat,splt=NULL,splt_idx=1,
   return(splt)
 }
 
-write.mat2fa<-function(mat,file,randomize_ambiguous=F){
-  seq_name<-colnames(mat)
-  decoded<-apply(mat,2,decodeATGC8,randomize_ambiguous=randomize_ambiguous)
-  output<-paste0(">",colnames(mat),"\n",decoded)
-  cat(output,file=file,sep="\n")
-}
-
-get.break.node<-function(rootVote,cutoff=200,pct_threshold=0.05){
-  retain<-which(rootVote[,2]>=max(rootVote[,2])-cutoff)
-  if(length(retain)==0){
-    tmp<-table(rootVote[,1])/nrow(rootVote)
-  }else{
-    tmp<-table(rootVote[retain,1])/length(retain)
-  }
-  root_node<-as.integer(names(tmp)[which.max(tmp)])
-  break_node<-setdiff(as.integer(names(tmp)[tmp>=pct_threshold]),root_node)
-  return(list(root_node=root_node,break_node=break_node))
-}
-
-break.pp<-function(phy,root_node,break_node){
-  phy$node.label<-1:Nnode(phy)+Ntip(phy)
-  break_edge<-matrix(phy$edge[phy$edge[,2]%in%break_node,],,2)
-  if(root_node>Ntip(phy)){
-    phy2<-root(phy,node=root_node,resolve.root=T)
-  }else{
-    phy2<-root(phy,outgroup=root_node,resolve.root=T)
-  }
-  transition<-rep(0,Nnode(phy2))
-  transitionIdx<-unique(phy2$edge[phy2$edge>Ntip(phy2)])-Ntip(phy2)
-  transition[transitionIdx]<-1:Nnode(phy2)+Ntip(phy2) ##old idx to new idx
-  phy2$node.label[transition[1:Nnode(phy2)]-Ntip(phy2)]<-phy2$node.label
-  phy2$edge[phy2$edge>Ntip(phy2)]<-transition[phy2$edge[phy2$edge>Ntip(phy2)]-Ntip(phy2)]
-  if(length(break_node)==0){
-    return(list(phy=phy2,break_edge=matrix(,0,2),break_node=integer()))
-  }
-  
-  transition<-1:(Nnode(phy)+Ntip(phy))
-  transition[as.integer(phy2$node.label[-1])]<-2:Nnode(phy2)+Ntip(phy2)
-  break_edge2<-t(apply(break_edge,1,function(x){
-    transition[x]
-  }))
-  phy2$node.label<-1:Nnode(phy2)+Ntip(phy2)
-  break_node2<-apply(break_edge2,1,function(x){
-    if(x[2]<=Ntip(phy2)){
-      return(x[2])
-    }else{
-      return(max(x))
-    }
-  })
-  return(list(phy=phy2,break_edge=break_edge2,break_node=break_node2))
-}
-
-gen.mat.big<-function(mat,tipname,ansMat=NULL,nodename=NULL,splt,return.mat=T){
-  mg_idx<-setdiff(unique(splt),0)
-  if(length(mg_idx)==0){
-    submat_idx<-1:ncol(mat)
-    if(return.mat){
-      output<-mat
-      colnames(output)<-tipname
-      return(list(submat=output,idx=submat_idx,splt=rep(0,ncol(mat))))
-    }else{
-      return(list(submat=NULL,idx=submat_idx,splt=rep(0,ncol(mat))))
-    }
-  }else{
-    if(return.mat){
-      output<-cbind(
-        output<-mat[,splt==0],
-        ansMat[,match(paste0("__M",mg_idx),nodename)]
-      )
-      colnames(output)<-c(tipname[splt==0],paste0("__M",mg_idx))
-    }
-    offset<-sum(splt==0)
-    submat_idx<-sapply(splt,function(x){
-      if(x==0) return(0)
-      else return(match(x,mg_idx)+offset)
-    })
-    submat_idx[submat_idx==0]<-1:offset
-    if(return.mat){
-      return(list(submat=output,idx=submat_idx,splt=c(rep(0,sum(splt==0)),mg_idx)))
-    }else{
-      return(list(submat=NULL,idx=submat_idx,splt=c(rep(0,sum(splt==0)),mg_idx)))
-    }
-  }
-}
-
-#' read packed matrix from bin file into a big matrix
-#'
-#' @param file The file name.
-#' @param chunk_size The chunk size used in reading.
-#' @param backingfile The file name of backing file. If NULL, create a big matrix in memory.
-#' @param backingpath The path to the backing file.
-#' @param descriptorfile The file name of descriptor file.
-#' 
-#' 
-#' @examples
-#' \dontrun{
-#' mat<-read.bin2bigmat(file="test.bin")
-#'}
-#'
-#' @return a big matrix.
-
-read.bin2bigmat<-function(file,chunk_size=32768L,
+read.bin2bigmat<-function(file,extraCols=0L,chunk_size=32768L,
                           backingfile=NULL,backingpath=NULL,descriptorfile=NULL){
   con<-file(file,"rb")
   d <- readBin(con = con, what = "integer", n = 2)
   mat<-big.matrix(
-    nrow=d[2],ncol=d[1],type="integer",
+    nrow=d[2],ncol=d[1]+extraCols,type="integer",
     backingfile=backingfile,backingpath=backingpath,descriptorfile=descriptorfile
   )
   if(log2(d[1])+log2(d[2])<31){
@@ -2407,126 +1924,514 @@ read.bin2bigmat<-function(file,chunk_size=32768L,
   return(mat)
 }
 
-#' reconstruct cluster-level phylogenies
-#'
-#' @param j The index of cluster.
-#' @param mat_desc The descriptor of matrix.
-#' @param tipname The names of tips.
-#' @param matfile The file name of backing matrix in hard disk.
-#' @param ansMat_desc The descriptor of matrix of pseudo-OTUs.
-#' @param nodename The name of pseudo-OTUs.
-#' @param splt Split of data from `split.data.DNA`.
-#' @param layer The layer of clusters.
-#' @param prefix The prefix of temporary file.
-#' @param cuda_path The path of CUDA script. If set to `NULL`, do not use CUDA.
-#' @param sample_size The percentage of outgroups sampled.
-#' @param pct_threshold The frequency threshold used in breaking edges.
-#' @param nbp_threshold The threshold used to filter out distal related outgroups.
-#' @param vft_thread The number of threads used in VeryFastTree.
-#' 
-#' @examples
-#' \dontrun{
-#' res<-partial.join.DNA(
-#'        mat_desc=mat_desc,
-#'        tipname=tipname,
-#'        matfile="test.bin",
-#'        ansMat_desc=NULL,
-#'        nodename=NULL,
-#'        splt=splt,
-#'        layer=2,
-#'        prefix="test",
-#'        cuda_path="~/CasPhy-cuda/build/"
-#'      )
-#'}
-#'
-#' @return a list containing the result.
-
-partial.join.DNA<-function(j,mat_desc,tipname,matfile,ansMat_desc,nodename,splt,layer,prefix,cuda_path,sample_size=0.1,
-                       pct_threshold=0.001,nbp_threshold=200,
-                       vft_thread=8){
-  mat<-attach.big.matrix(mat_desc)
-  if(!is.null(ansMat_desc)){
-    ansMat<-attach.big.matrix(ansMat_desc)
-  }else{
-    ansMat<-NULL
-  }
-  inIdx<-which(splt[,layer]==j)
-  outIdx<-which(splt[,layer]!=j)
-  inmat<-gen.mat.big(mat[,inIdx],tipname[inIdx],ansMat,nodename,splt[inIdx,layer+1])
-  tip2pseudo<-inmat$idx
-  inmat<-inmat$submat
-  tipLabel<-colnames(inmat)
-  
-  ##run VeryFastTree
-  write.mat2fa(inmat,file=paste0(prefix,"__M",j,".fasta"),randomize_ambiguous=F)
-  system(paste0("VeryFastTree -nosupport -fastest -nt ",prefix,"__M",j,".fasta -threads ",vft_thread," 1>",prefix,"__M",j,".nwk 2>",prefix,"__M",j,".vftlog"))
-  unlink(paste0(prefix,"__M",j,".fasta",sep=""))
-  phy<-read.tree(paste0(prefix,"__M",j,".nwk"))
-  unlink(paste0(prefix,"__M",j,".nwk"))
-  phy<-order.tip(phy,tipLabel)
-  node_mat<-nucleoAncestral(inmat,phy$edge,Ntip(phy),Nnode(phy))$nodeState
-  node_mat<-cbind(inmat,node_mat)
-  t2<-Sys.time()
-  
-  if(length(outIdx)==0){
-    return(list(phys=list(phy),category=rep(1,length(inIdx)),ansState=node_mat[,1],isbroken=F))
-  }
-  nSample<-max(16384,floor(length(outIdx)*sample_size))
-  if(length(outIdx)>nSample){
-    outIdx<-sort(sample(outIdx,nSample))
-  }
-  
-  ##root phy
-  t1<-Sys.time()
-  if(Ntip(phy)<=100*16384/nSample){
-    #    rootVote<-findRoot(phy$edge,node_mat,mat,outIdx-1L)
-    rootVote<-findRootAVX2Big(phy$edge,node_mat,mat@address,outIdx-1L)
-  }else{
-    write.mat2bin(node_mat,file=paste0(prefix,"__M",j,".nodeState"))
-    write.mat2bin(matrix(outIdx-1L,,1),file=paste0(prefix,"__M",j,".outmatIdx"))
-    write.mat2bin(t(phy$edge),file=paste0(prefix,"__M",j,".edge"))
-    system(paste0(cuda_path,"voteRoot2 ",matfile," ",prefix,"__M",j))
-    rootVote<-read.bin2mat(paste0(prefix,"__M",j,".rootVote"))
-    rootVote[,1]<-rootVote[,1]+1L
-    unlink(paste0(prefix,"__M",j,".nodeState"))
-    unlink(paste0(prefix,"__M",j,".outmatIdx"))
-    unlink(paste0(prefix,"__M",j,".edge"))
-    unlink(paste0(prefix,"__M",j,".rootVote"))
-  }
-  breakRes<-get.break.node(rootVote,cutoff=nbp_threshold,pct_threshold=pct_threshold)
-  root_node<-breakRes$root_node
-  break_node<-breakRes$break_node
-  rootedRes<-break.pp(phy,root_node,break_node)
-  phy<-rootedRes$phy
-  break_node<-rootedRes$break_node
-  nodes_retain<-breakUnrootedPhy(phy$edge,Ntip(phy),Nnode(phy),breakNode=break_node)
-  nodes_retain<-sort(nodes_retain[nodes_retain>Ntip(phy)])
-  if(length(nodes_retain)==0){
-    return(list(phys=list(),category=rep(0,length(inIdx)),ansState=NULL,isbroken=T,inIdx=inIdx))
-  }
-  t2<-Sys.time()
-  
-  node_mat<-nucleoAncestral(inmat,phy$edge,Ntip(phy),Nnode(phy))$nodeState
-  node_mat<-node_mat[,nodes_retain-Ntip(phy)]
-  tmp<-phy.break(phy,nodes_retain)
-  broken_phys<-tmp$phys
-  category<-tmp$category
-  return(list(phys=broken_phys,category=category[tip2pseudo],ansState=node_mat,isbroken=T,inIdx=inIdx))
+get.phySize<-function(x){
+  length(setdiff(unique(x),0))+sum(x==0)
 }
 
-#' summarize the results from `partial.join.DNA`
-#'
-#' @param partial_res_collected The results from `partial.join.DNA`.
-#' @param clustIdx The indices of clusters.
-#' @param splt The splt object used in phylogenetic reconstruction.
-#' @param layer The layer of clusters.
-#' 
-#' @examples
-#' \dontrun{
-#' mat<-read.bin2bigmat(file="test.bin")
-#'}
-#'
-#' @return summarized results.
+addOffset<-function(x,offset){
+  x[x!=0]<-x[x!=0]+offset
+  return(x)
+}
+
+check.split<-function(x,sizeBound=c(10000L,10000L),ratio_bound=1.2,min_size=10){
+  topMax<-get.phySize(regularize.split(x=x,min_size=min_size))
+  bottomMax<-max(table(x))
+  cat("topMax:",topMax,"bottomMax:",bottomMax,fill=T)
+  if(topMax/bottomMax<=ratio_bound&bottomMax/topMax<=ratio_bound){
+    if(sizeBound[1]==0&sizeBound[2]==0){
+      return(c(0,1,(topMax+bottomMax)/2))
+    }
+    if(sizeBound[1]>0&topMax<=sizeBound[1]){
+      return(c(0,1,(topMax+bottomMax)/2))
+    }
+    if(sizeBound[2]>0&bottomMax<=sizeBound[2]){
+      return(c(0,1,(topMax+bottomMax)/2))
+    }
+  }
+  if(topMax>=bottomMax){
+    output<-c(-1,1,(topMax+bottomMax)/2)
+  }else{
+    output<-c(1,1,(topMax+bottomMax)/2)
+  }
+  if(sizeBound[1]>0&topMax>sizeBound[1]){
+    output<-c(-1,0,(topMax+bottomMax)/2)
+  }else if(sizeBound[2]>0&bottomMax>sizeBound[2]){
+    output<-c(1,0,(topMax+bottomMax)/2)
+  }
+  return(output)
+}
+
+autoSplit<-function(mat,prefix,weight=NULL,data_type="DNA",
+                    radius_initial=100L,fixed=F,
+                    step=ceiling(radius_initial/10),radius_bound=ceiling(radius_initial/10),
+                    nReplicate=1024L,sizeBound=c(0L,0L),ratio_bound=1.2,nNeighborBound=9.5,
+                    p_shared=0.8,min_size=10,try_limit=20,cuda_path=NULL){
+  if(data_type=="DNA"){
+    mat_file<-paste0(prefix,".tbmat")
+    cuda_script<-"radiusNeighborDNA"
+    ntip<-ncol(mat)
+    tmp_file<-c(
+      paste0(prefix,".idx"),
+      paste0(prefix,".nNeighbor"),
+      paste0(prefix,".member"),
+      mat_file
+    )
+  }else if(data_type=="binary"){
+    mat_file<-paste0(prefix,".bmat")
+    cuda_script<-"radiusNeighbor"
+    ntip<-nrow(mat)
+    if(is.null(weight)){
+      weight<-rep(1.0,ncol(mat)*32)
+    }
+    writeBin(object=as.vector(weight),con=paste0(prefix,".w"))
+    tmp_file<-c(
+      paste0(prefix,".idx"),
+      paste0(prefix,".nNeighbor"),
+      paste0(prefix,".member"),
+      paste0(prefix,".w"),
+      mat_file
+    )
+  }
+  write.mat2bin(mat,file=mat_file)
+  radius<-radius_initial
+  
+  if(fixed){
+    cat(as.character(Sys.time()),": CUDA start with radius ",radius,sep="",fill=T)
+    system(paste0(cuda_path,cuda_script," ",prefix," ",radius))
+    system(paste0(cuda_path,"tipMerge ",prefix," ",p_shared))
+    temp<-read.table(file=paste0(prefix,".member"))[,1]
+    unlink(tmp_file)
+    return(list(radius,temp))
+  }
+  
+  nNeighborBound<-nNeighborBound-log10(ntip)
+  nNeighbor<-nNeighborBound+1
+  radius<-radius-step
+  while(nNeighbor>nNeighborBound){
+    radius<-radius+step
+    cat(as.character(Sys.time()),": CUDA try start with radius ",radius,sep="",fill=T)
+    if(data_type=="DNA"){
+      system(paste0(cuda_path,"tryRadiusDNA ",prefix," ",radius," ",nReplicate))
+      sizeTmp<-read.bin2mat(file=paste0(prefix,".nNeighbor"))[,2]
+    }else if(data_type=="binary"){
+      system(paste0(cuda_path,"tryRadius ",prefix," ",radius," ",nReplicate))
+      sizeTmp<-read.bin2mat(file=paste0(prefix,".nNeighbor"))[,2]
+    }
+    nNeighbor<-log10(mean(sizeTmp))
+  }
+  
+  cat(as.character(Sys.time()),": CUDA start with radius ",radius,sep="",fill=T)
+  system(paste0(cuda_path,cuda_script," ",prefix," ",radius))
+  system(paste0(cuda_path,"tipMerge ",prefix," ",p_shared))
+  temp<-read.table(file=paste0(prefix,".member"))[,1]
+  res<-matrix(temp,,1)
+  dct<-check.split(temp,sizeBound=sizeBound,ratio_bound=ratio_bound,min_size=min_size)
+  radiusStack<-radius
+  validStack<-dct[2]
+  sizeStack<-dct[3]
+  if(dct[1]==0){
+    unlink(tmp_file)
+    return(list(radius,temp))
+  }else{
+    radius<-radius+dct[1]*step
+  }
+  
+  k<-1
+  while(k<=try_limit&radius>=radius_bound){
+    cat(as.character(Sys.time()),": CUDA start with radius ",radius,sep="",fill=T)
+    system(paste0(cuda_path,cuda_script," ",prefix," ",radius))
+    sizeTmp<-read.bin2mat(file=paste0(prefix,".nNeighbor"))[,1]
+    nNeighbor<-log10(mean(sizeTmp))
+    if(nNeighbor>nNeighborBound){
+      unlink(tmp_file)
+      return(list(radiusStack[k],res[,k]))
+    }
+    system(paste0(cuda_path,"tipMerge ",prefix," ",p_shared))
+    temp<-read.table(file=paste0(prefix,".member"))[,1]
+    dct<-check.split(temp,sizeBound=sizeBound,ratio_bound=ratio_bound,min_size=min_size)
+    if(dct[1]==0){
+      unlink(tmp_file)
+      return(list(radius,temp))
+    }else if((radius-radiusStack[k])*dct[1]<0){
+      if(dct[2]==1&validStack[k]==1){
+        if(dct[3]<sizeStack[k]){
+          unlink(tmp_file)
+          return(list(radius,temp))
+        }else{
+          unlink(tmp_file)
+          return(list(radiusStack[k],res[,k]))
+        }
+      }else if(dct[2]==1){
+        unlink(tmp_file)
+        return(list(radius,temp))
+      }else{
+        unlink(tmp_file)
+        return(list(radiusStack[k],res[,k]))
+      }
+    }else{
+      res<-cbind(res,temp)
+      radiusStack<-c(radiusStack,radius)
+      validStack<-c(validStack,dct[2])
+      sizeStack<-c(sizeStack,dct[3])
+      k<-k+1
+      radius<-radius+dct[1]*step
+    }
+  }
+  unlink(tmp_file)
+  return(list(radiusStack[k-1],res[,k-1]))
+}
+
+gen.mat<-function(mat,inIdx,ansMat=NULL,splt,return.mat=T){
+  ##row:tip col:feature
+  mg_idx<-setdiff(unique(splt),0)
+  if(length(mg_idx)==0){
+    submat_idx<-1:length(inIdx)
+    if(return.mat){
+      return(list(submat=mat[,inIdx],idx=submat_idx,splt=rep(0,length(inIdx))))
+    }else{
+      return(list(submat=NULL,idx=submat_idx,splt=rep(0,length(inIdx))))
+    }
+  }else{
+    if(return.mat){
+      output<-cbind(
+        output<-mat[,inIdx[splt==0]],
+        ansMat[,paste0("__M",mg_idx)]
+      )
+      colnames(output)<-c(colnames(mat)[inIdx][splt==0],paste0("__M",mg_idx))
+    }
+    offset<-sum(splt==0)
+    submat_idx<-sapply(splt,function(x){
+      if(x==0) return(0)
+      else return(match(x,mg_idx)+offset)
+    })
+    submat_idx[submat_idx==0]<-1:offset
+    if(return.mat){
+      return(list(submat=output,idx=submat_idx,splt=c(rep(0,sum(splt==0)),mg_idx)))
+    }else{
+      return(list(submat=NULL,idx=submat_idx,splt=c(rep(0,sum(splt==0)),mg_idx)))
+    }
+  }
+}
+
+h.partial.join.inMem<-function(
+    mat,splt,bit_coded=F,weight=NULL,keep_cutoff=1,
+    sizeBound=100000L,radius_initial=0L,tryStep=0L,
+    ancestralType=0,
+    sizeOfTips=rep(1,nrow(mat)),minSize=0,minRatio=2,
+    prefix="./",cuda_path=NULL,cuda_threshold=500,
+    ncore=1,verbose=T
+){
+  partial.join<-function(j){
+    inIdx<-which(splt[,layer]==j)
+    outIdx<-which(splt[,layer]!=j)
+    inmat<-gen.mat(mat,inIdx,ansMat,splt[inIdx,layer+1])
+    tip2pseudo<-inmat$idx
+    if(!bit_coded){
+      tipSize<-sapply(1:ncol(inmat$submat),function(x){
+        sum(sizeOfTips[inIdx][tip2pseudo==x])
+      })
+      tipSize<-as.integer(tipSize)
+    }
+    inmat<-inmat$submat
+    tipLabel<-colnames(inmat)
+    
+    ##using CUDA to join or not
+    if(ncol(inmat)<cuda_threshold||is.null(cuda_path)){
+      phyData<-phy.join(
+        inmat=inmat,
+        bit_coded=bit_coded,
+        weight=w,
+        ancestralType=ancestralType,
+        tipSize=tipSize,
+        minSize=minSize,
+        minRatio=minRatio
+      )
+      rm(inmat)
+      phy<-phyData$phy
+      node_mat<-phyData$node_mat
+      rm(phyData)
+      if(length(outIdx)==0){
+        return(list(phys=list(phy),category=rep(1,length(inIdx)),ansState=node_mat[,1],isbroken=F))
+      }
+      
+      tmpSplt<-splt[outIdx,layer+1]
+      idx1<-outIdx[tmpSplt==0]
+      mgIdx<-setdiff(unique(tmpSplt),0)
+      if(length(mgIdx)>0){
+        idx2<-match(paste0("__M",setdiff(unique(tmpSplt),0)),colnames(ansMat))
+      }else{
+        idx2<-integer()
+      }
+      if(bit_coded){
+        idx1f<-outmatFilterBit2(mat,idx1-1L,node_mat[,1],cutoff=keep_cutoff)+1L
+        idx2f<-outmatFilterBit2(ansMat,idx2-1L,node_mat[,1],cutoff=keep_cutoff)+1L
+      }else{
+        idx1f<-outmatFilterIndel2(mat,idx1-1L,node_mat[,1],cutoff=keep_cutoff)+1L
+        idx2f<-outmatFilterIndel2(ansMat,idx2-1L,node_mat[,1],cutoff=keep_cutoff)+1L
+      }
+      if(length(idx1f)+length(idx2f)==0){
+        return(list(phys=list(phy),category=rep(1,length(inIdx)),ansState=node_mat[,1],isbroken=F))
+      }else{
+        outmat<-cbind(mat[,idx1f],ansMat[,idx2f])
+      }
+      
+      if(bit_coded){
+        ## the results are copied from edge, the idx of thy$edge is 1-based, no need to plus one
+        nodes_retain<-nodeKeepBit2(
+          edge=phy$edge,
+          Ntip=Ntip(phy),
+          node_mat=node_mat,
+          outmat=outmat,
+          keep_cutoff=keep_cutoff
+        )
+      }else{
+        nodes_retain<-nodeKeepIndel(
+          edge=phy$edge,
+          Ntip=Ntip(phy),
+          node_mat=node_mat,
+          outmat=outmat,
+          keep_cutoff=keep_cutoff
+        )
+      }
+      rm(outmat)
+      nodes_retain<-sort(nodes_retain[nodes_retain>Ntip(phy)])
+      node_mat<-node_mat[,nodes_retain-Ntip(phy)]
+    }else{
+      if(bit_coded){
+        write.mat2bin(inmat,file=paste0(prefix,"__M",j,".tbmat",sep=""))
+        ntip<-ncol(inmat)
+        rm(inmat)
+        system(paste0(cuda_path,"joinEdgeBitReverse ",prefix,"__M",j," ",wfile," ",ancestralType))
+      }else{
+        write.mat2bin(inmat+1L,file=paste0(prefix,"__M",j,".tbmat",sep=""))
+        write.mat2bin(matrix(tipSize,,1),file=paste0(prefix,"__M",j,".tipSize",sep=""))
+        rm(inmat)
+        system(paste0(cuda_path,"joinEdgeIndel ",prefix,"__M",j," ",wfile," ",nrow(w)," ",minSize," ",minRatio))
+      }
+      unlink(paste0(prefix,"__M",j,".tbmat"))
+      unlink(paste0(prefix,"__M",j,".tipSize",sep=""))
+      edge<-read.bin2mat(paste0(prefix,"__M",j,".edge2"))
+      phy<-edge2phy(edge,tipLabel)
+      node_mat<-read.bin2mat(paste0(prefix,"__M",j,".nodeState2",sep=""))
+      if(!bit_coded){
+        node_mat<-node_mat-1L
+      }
+      if(length(outIdx)==0){
+        unlink(paste0(prefix,"__M",j,".edge2"))
+        unlink(paste0(prefix,"__M",j,".nodeState2"))
+        return(list(phys=list(phy),category=rep(1,length(inIdx)),ansState=node_mat[,1],isbroken=F))
+      }
+      
+      tmpSplt<-splt[outIdx,layer+1]
+      idx1<-outIdx[tmpSplt==0]
+      mgIdx<-setdiff(unique(tmpSplt),0)
+      if(length(mgIdx)>0){
+        idx2<-match(paste0("__M",setdiff(unique(tmpSplt),0)),colnames(ansMat))
+      }else{
+        idx2<-integer()
+      }
+      if(bit_coded){
+        idx1f<-outmatFilterBit2(mat,idx1-1L,node_mat[,1],cutoff=keep_cutoff)+1L
+        idx2f<-outmatFilterBit2(ansMat,idx2-1L,node_mat[,1],cutoff=keep_cutoff)+1L
+      }else{
+        idx1f<-outmatFilterIndel2(mat,idx1-1L,node_mat[,1],cutoff=keep_cutoff)+1L
+        idx2f<-outmatFilterIndel2(ansMat,idx2-1L,node_mat[,1],cutoff=keep_cutoff)+1L
+      }
+      if(length(idx1f)+length(idx2f)==0){
+        unlink(paste0(prefix,"__M",j,".edge2"))
+        unlink(paste0(prefix,"__M",j,".nodeState2"))
+        return(list(phys=list(phy),category=rep(1,length(inIdx)),ansState=node_mat[,1],isbroken=F))
+      }else{
+        outmat<-cbind(mat[,idx1f],ansMat[,idx2f])
+      }
+      
+      ########using CUDA to break phy or not
+      if(ncol(outmat)<128){
+        unlink(paste0(prefix,"__M",j,".edge2"))
+        unlink(paste0(prefix,"__M",j,".nodeState2"))
+        if(bit_coded){
+          ## the results are copied from edge, the idx of thy$edge is 1-based, no need to plus one
+          nodes_retain<-nodeKeepBit2(
+            edge=phy$edge,
+            Ntip=Ntip(phy),
+            node_mat=node_mat,
+            outmat=outmat,
+            keep_cutoff=keep_cutoff
+          )
+        }else{
+          nodes_retain<-nodeKeepIndel(
+            edge=phy$edge,
+            Ntip=Ntip(phy),
+            node_mat=node_mat,
+            outmat=outmat,
+            keep_cutoff=keep_cutoff
+          )
+        }
+        rm(outmat)
+        nodes_retain<-sort(nodes_retain[nodes_retain>Ntip(phy)])
+        node_mat<-node_mat[,nodes_retain-Ntip(phy)]
+      }else{
+        if(bit_coded){
+          write.mat2bin(outmat,file=paste0(prefix,"__M",j,".tboutmat",sep=""))
+          rm(outmat)
+          system(paste0(cuda_path,"nodeKeepBit ",prefix,"__M",j," ",keep_cutoff))
+        }else{
+          write.mat2bin(outmat+1L,file=paste0(prefix,"__M",j,".tboutmat",sep=""))
+          rm(outmat)
+          system(paste0(cuda_path,"nodeKeepIndel ",prefix,"__M",j," ",keep_cutoff))
+        }
+        if(file.size(paste0(prefix,"__M",j,".retainNode"))==0){
+          nodes_retain<-integer()
+        }else{
+          nodes_retain<-read.table(file=paste0(prefix,"__M",j,".retainNode"))[,1]+1
+          nodes_retain<-sort(nodes_retain)
+        }
+        unlink(paste0(prefix,"__M",j,".edge2"))
+        unlink(paste0(prefix,"__M",j,".nodeState2"))
+        unlink(paste0(prefix,"__M",j,".tboutmat"))
+        unlink(paste0(prefix,"__M",j,".retainNode"))
+        node_mat<-node_mat[,nodes_retain-Ntip(phy)]
+      }
+    }
+    if(length(nodes_retain)==0){
+      return(list(phys=list(),category=rep(0,length(inIdx)),ansState=node_mat,isbroken=T,inIdx=inIdx))
+    }else{
+      tmp<-phy.break(phy,nodes_retain)
+      broken_phys<-tmp$phys
+      category<-tmp$category
+      return(list(phys=broken_phys,category=category[tip2pseudo],ansState=node_mat,isbroken=T,inIdx=inIdx))
+    }
+  }
+  if(length(keep_cutoff)==1){
+    keep_cutoff_original<-c(keep_cutoff,keep_cutoff)
+  }else{
+    keep_cutoff_original<-keep_cutoff
+  }
+  keep_cutoff<-keep_cutoff_original[1]
+  wfile<-paste0(prefix,".w",sep="")
+  if(!bit_coded){
+    mat<-regularize.mat(mat,mat)
+    if(is.null(weight)){
+      tmp<-mat2bit(mat,return.bit=F)
+      w<-matrix(1,max(diff(tmp$loci)),ncol(mat))
+      rm(tmp)
+    }else{
+      w<-weight
+    }
+    writeBin(as.numeric(t(w)),con=wfile)
+  }else{
+    if(is.null(weight)){
+      w<-rep(1,ncol(mat)*32)
+    }else{
+      w<-weight
+    }
+    writeBin(as.numeric(w),con=wfile)
+  }
+  
+  if(!all(splt[,ncol(splt)]==0)){
+    splt<-cbind(splt,0)
+  }
+  max_mg_idx<-max(splt)
+  phys<-list()
+  mat<-t(mat)
+  ansMat<-matrix(integer(),nrow(mat),0)
+  layer<-ncol(splt)-1
+  while(layer>=1){
+    if(layer==1){
+      phySize<-get.phySize(splt[,2])
+      #      if(phySize>sizeBound&bit_coded){
+      if(0){
+        cat(as.character(Sys.time()),"splitting backbone tree, No. tips:",phySize,fill=T)
+        matTmp<-gen.mat(mat,1:nrow(splt),ansMat,splt[,2])
+        idxTmp<-matTmp$idx
+        res<-autoSplit(
+          mat=matTmp$submat,prefix=prefix,weight=w,data_type="binary",
+          radius_initial=radius_initial,
+          fixed=F,step=tryStep,radius_bound=tryStep,
+          sizeBound=c(sizeBound,0L),cuda_path=cuda_path
+        )
+        rm(matTmp)
+
+        spltTmp<-res[[2]]
+        spltTmp<-regularize.split(spltTmp,min_size=10)
+        nPseudoTip<-get.phySize(spltTmp)
+        if(nPseudoTip<phySize*0.75){
+          spltTmp<-addOffset(spltTmp,max(splt))
+          spltTmp<-spltTmp[idxTmp]
+          splt<-cbind(1,spltTmp,splt[,2:ncol(splt)])
+          max_mg_idx<-max(splt)
+          layer<-2
+          keep_cutoff<-keep_cutoff_original[2]
+          next
+        }else{
+          cat(as.character(Sys.time()),"splitting backbone tree failed, perform direct reconstruction",fill=T)
+        }
+      }
+    }
+    
+    writeBin(as.numeric(w),con=wfile)
+    clustIdx<-setdiff(sort(unique(splt[,layer])),0)
+    clusterSize<-sapply(clustIdx,function(x){
+      inTip<-splt[splt[,layer]==x,layer+1]
+      return(get.phySize(inTip))
+    })
+    cat(
+      as.character(Sys.time()),
+      "layer:",layer,
+      "No. clusters:",length(clustIdx),
+      "max size:",max(clusterSize),"\n",fill=F
+    )
+    # clustIdx<-clustIdx[order(clusterSize,decreasing=T)]
+    set.seed(1)
+    if(length(clustIdx)>1){
+      clustIdx<-sample(clustIdx,length(clustIdx))
+    }
+    if(ncore>1&length(clustIdx)>1){
+      cl<-makeForkCluster(max(min(ncore,length(clustIdx)),4))
+      partial_res_collected<-parLapply(cl,clustIdx,partial.join)
+      stopCluster(cl)
+    }else{
+      partial_res_collected<-list()
+      for(j in clustIdx){
+        partial_res_collected<-c(partial_res_collected,list(partial.join(j)))
+      }
+    }
+
+    cat(as.character(Sys.time()),"summerizing layer ",layer,fill=T)
+    
+    res_packed<-layer.summarize(partial_res_collected,clustIdx,splt,layer)
+    phys<-c(phys,res_packed$phys)
+    if(!is.null(res_packed$ansMat)){
+      ansMat<-cbind(ansMat,res_packed$ansMat)
+    }
+    splt<-res_packed$splt
+    cat(as.character(Sys.time())," layer ",layer," finished",fill=T)
+    layer<-layer-1
+  }
+  unlink(wfile)
+  return(phys)
+}
+
+gen.mat.big<-function(mat,tipname,splt,inIdx){
+  mg_idx<-setdiff(unique(splt[inIdx]),0)
+  if(length(mg_idx)==0){
+    submat_idx<-1:length(inIdx)
+    output<-subcols_bigmat(mat@address,inIdx)
+    colnames(output)<-tipname[inIdx]
+    return(list(submat=output,idx=submat_idx,splt=rep(0,length(inIdx))))
+  }else{
+    inIdx2<-inIdx[splt[inIdx]==0]
+    output<-subcols_bigmat(mat@address,c(inIdx2,match(paste0("__M",mg_idx),tipname)))
+    colnames(output)<-c(tipname[inIdx2],paste0("__M",mg_idx))
+    offset<-sum(splt[inIdx]==0)
+    submat_idx<-sapply(splt[inIdx],function(x){
+      if(x==0) return(0)
+      else return(match(x,mg_idx)+offset)
+    })
+    submat_idx[submat_idx==0]<-1:offset
+    return(list(submat=output,idx=submat_idx,splt=c(rep(0,sum(splt[inIdx]==0)),mg_idx)))
+  }
+}
 
 layer.summarize<-function(partial_res_collected,clustIdx,splt,layer){
   max_mg_idx<-max(splt)
@@ -2553,28 +2458,13 @@ layer.summarize<-function(partial_res_collected,clustIdx,splt,layer){
   if(length(tmp)>0){
     names(newPhys)<-paste0("__M",tmp)
   }
-  # phys<-c(phys,newPhys)
-  
-  newAnsMat<-lapply(partial_res_collected,function(x) x$ansState)
-  nbin<-NULL
-  for(obj in newAnsMat){
-    if(!is.null(obj)){
-      if(is.matrix(obj)){
-        nbin<-nrow(obj)
-      }else{
-        nbin<-length(obj)
-      }
-    }
-  }
-  if(!is.null(nbin)){
-    newAnsMat<-matrix(unlist(newAnsMat),nbin,)
+  if(length(tmp)>0){
+    newAnsMat<-lapply(partial_res_collected,function(x) x$ansState)
+    newAnsMat<-matrix(unlist(newAnsMat),,length(tmp))
+    colnames(newAnsMat)<-paste0("__M",tmp)      
   }else{
     newAnsMat<-NULL
   }
-  if(length(tmp)>0&!is.null(newAnsMat)){
-    colnames(newAnsMat)<-paste0("__M",tmp)      
-  }
-  # ansMat<-cbind(ansMat,newAnsMat)
   
   replaceIdx<-unlist(lapply(partial_res_collected,function(x){
     if(x$isbroken){
@@ -2592,9 +2482,457 @@ layer.summarize<-function(partial_res_collected,clustIdx,splt,layer){
       return(integer())
     }
   }))
+  tmpIdx<-which(splt[,layer]==0)
+  splt[tmpIdx,layer]<-splt[tmpIdx,layer+1]
   temp<-splt[replaceIdx,layer+1]
-  temp[new_group>0]<-new_group[new_group>0]
+  tmpIdx<-which(new_group>0)
+  temp[tmpIdx]<-new_group[tmpIdx]
   splt[replaceIdx,layer]<-temp
+
   return(list(splt=splt,phys=newPhys,ansMat=newAnsMat))
 }
 
+h.partial.join.bigMem<-function(
+    mat,splt,bit_coded=F,weight=NULL,keep_cutoff=1,
+    sizeBound=100000L,radius_initial=0L,tryStep=0L,
+    ancestralType=0,
+    sizeOfTips=rep(1,nrow(mat)),minSize=0,minRatio=2,
+    prefix="./",cuda_path=NULL,cuda_threshold=500,
+    file_backed=F,ncore=1,batch_size=ncore,verbose=T
+){
+  ############
+  partial.join<-function(j){
+    mat<-attach.big.matrix(mat_desc)
+    inIdx<-which(splt[,layer]==j)
+    outIdx<-which(splt[,layer]!=j)
+    inmat<-gen.mat.big(mat,tipname,splt[,layer+1],inIdx=inIdx)
+    tip2pseudo<-inmat$idx
+    if(!bit_coded){
+      tipSize<-sapply(1:ncol(inmat$submat),function(x){
+        sum(sizeOfTips[inIdx][tip2pseudo==x])
+      })
+      tipSize<-as.integer(tipSize)
+    }
+    inmat<-inmat$submat
+    tipLabel<-colnames(inmat)
+    
+    ##using CUDA to join or not
+    if(ncol(inmat)<cuda_threshold||is.null(cuda_path)){
+      phyData<-phy.join(
+        inmat=inmat,
+        bit_coded=bit_coded,
+        weight=w,
+        ancestralType=ancestralType,
+        tipSize=tipSize,
+        minSize=minSize,
+        minRatio=minRatio
+      )
+      rm(inmat)
+      phy<-phyData$phy
+      node_mat<-phyData$node_mat
+      rm(phyData)
+      if(length(outIdx)==0){
+        return(list(phys=list(phy),category=rep(1,length(inIdx)),ansState=node_mat[,1],isbroken=F))
+      }
+      
+      tmpSplt<-splt[outIdx,layer+1]
+      idx1<-outIdx[tmpSplt==0]
+      mgIdx<-setdiff(unique(tmpSplt),0)
+      if(length(mgIdx)>0){
+        idx2<-match(paste0("__M",setdiff(unique(tmpSplt),0)),tipname)
+      }else{
+        idx2<-integer()
+      }
+      idx<-c(idx1,idx2)
+      if(bit_coded){
+        idxf<-outmatFilterBitBig(mat@address,idx-1L,node_mat[,1],cutoff=keep_cutoff)+1L
+        # idx2f<-outmatFilterBit2(as.matrix(ansMat),idx2-1L,node_mat[,1],cutoff=keep_cutoff)+1L
+      }else{
+        idxf<-outmatFilterIndelBig(mat@address,idx-1L,node_mat[,1],cutoff=keep_cutoff)+1L
+        # idx2f<-outmatFilterIndel2(as.matrix(ansMat),idx2-1L,node_mat[,1],cutoff=keep_cutoff)+1L
+      }
+      if(length(idxf)==0){
+        return(list(phys=list(phy),category=rep(1,length(inIdx)),ansState=node_mat[,1],isbroken=F))
+      }else{
+        # outmat<-matrix(mat[,idxf],nrow(mat),)
+        outmat<-subcols_bigmat(mat@address,idxf)
+      }
+      
+      if(bit_coded){
+        ## the results are copied from edge, the idx of thy$edge is 1-based, no need to plus one
+        nodes_retain<-nodeKeepBit2(
+          edge=phy$edge,
+          Ntip=Ntip(phy),
+          node_mat=node_mat,
+          outmat=outmat,
+          keep_cutoff=keep_cutoff
+        )
+      }else{
+        nodes_retain<-nodeKeepIndel(
+          edge=phy$edge,
+          Ntip=Ntip(phy),
+          node_mat=node_mat,
+          outmat=outmat,
+          keep_cutoff=keep_cutoff
+        )
+      }
+      rm(outmat)
+      nodes_retain<-sort(nodes_retain[nodes_retain>Ntip(phy)])
+      node_mat<-node_mat[,nodes_retain-Ntip(phy)]
+    }else{
+      if(bit_coded){
+        write.mat2bin(inmat,file=paste0(prefix,"__M",j,".tbmat",sep=""))
+        # ntip<-ncol(inmat)
+        rm(inmat)
+        system(paste0(cuda_path,"joinEdgeBitReverse ",prefix,"__M",j," ",wfile," ",ancestralType))
+      }else{
+        write.mat2bin(inmat+1L,file=paste0(prefix,"__M",j,".tbmat",sep=""))
+        write.mat2bin(matrix(tipSize,,1),file=paste0(prefix,"__M",j,".tipSize",sep=""))
+        rm(inmat)
+        system(paste0(cuda_path,"joinEdgeIndel ",prefix,"__M",j," ",wfile," ",nrow(w)," ",minSize," ",minRatio))
+      }
+      unlink(paste0(prefix,"__M",j,".tbmat"))
+      unlink(paste0(prefix,"__M",j,".tipSize",sep=""))
+      edge<-read.bin2mat(paste0(prefix,"__M",j,".edge2"))
+      phy<-edge2phy(edge,tipLabel)
+      node_mat<-read.bin2mat(paste0(prefix,"__M",j,".nodeState2",sep=""))
+      if(!bit_coded){
+        node_mat<-node_mat-1L
+      }
+      if(length(outIdx)==0){
+        unlink(paste0(prefix,"__M",j,".edge2"))
+        unlink(paste0(prefix,"__M",j,".nodeState2"))
+        return(list(phys=list(phy),category=rep(1,length(inIdx)),ansState=node_mat[,1],isbroken=F))
+      }
+      
+      tmpSplt<-splt[outIdx,layer+1]
+      idx1<-outIdx[tmpSplt==0]
+      mgIdx<-setdiff(unique(tmpSplt),0)
+      if(length(mgIdx)>0){
+        idx2<-match(paste0("__M",setdiff(unique(tmpSplt),0)),tipname)
+      }else{
+        idx2<-integer()
+      }
+      idx<-c(idx1,idx2)
+      if(bit_coded){
+        idxf<-outmatFilterBitBig(mat@address,idx-1L,node_mat[,1],cutoff=keep_cutoff)+1L
+        # idx2f<-outmatFilterBit2(as.matrix(ansMat),idx2-1L,node_mat[,1],cutoff=keep_cutoff)+1L
+      }else{
+        idxf<-outmatFilterIndelBig(mat@address,idx-1L,node_mat[,1],cutoff=keep_cutoff)+1L
+        # idx2f<-outmatFilterIndel2(as.matrix(ansMat),idx2-1L,node_mat[,1],cutoff=keep_cutoff)+1L
+      }
+      if(length(idxf)==0){
+        unlink(paste0(prefix,"__M",j,".edge2"))
+        unlink(paste0(prefix,"__M",j,".nodeState2"))
+        return(list(phys=list(phy),category=rep(1,length(inIdx)),ansState=node_mat[,1],isbroken=F))
+      }else{
+        # outmat<-mat[,idxf]
+        outmat<-subcols_bigmat(mat@address,idxf)
+      }
+      
+      ########using CUDA to break phy or not
+      if(ncol(outmat)<128){
+        unlink(paste0(prefix,"__M",j,".edge2"))
+        unlink(paste0(prefix,"__M",j,".nodeState2"))
+        if(bit_coded){
+          ## the results are copied from edge, the idx of thy$edge is 1-based, no need to plus one
+          nodes_retain<-nodeKeepBit2(
+            edge=phy$edge,
+            Ntip=Ntip(phy),
+            node_mat=node_mat,
+            outmat=outmat,
+            keep_cutoff=keep_cutoff
+          )
+        }else{
+          nodes_retain<-nodeKeepIndel(
+            edge=phy$edge,
+            Ntip=Ntip(phy),
+            node_mat=node_mat,
+            outmat=outmat,
+            keep_cutoff=keep_cutoff
+          )
+        }
+        rm(outmat)
+        nodes_retain<-sort(nodes_retain[nodes_retain>Ntip(phy)])
+        node_mat<-node_mat[,nodes_retain-Ntip(phy)]
+      }else{
+        if(bit_coded){
+          write.mat2bin(outmat,file=paste0(prefix,"__M",j,".tboutmat",sep=""))
+          rm(outmat)
+          system(paste0(cuda_path,"nodeKeepBit ",prefix,"__M",j," ",keep_cutoff))
+        }else{
+          write.mat2bin(outmat+1L,file=paste0(prefix,"__M",j,".tboutmat",sep=""))
+          rm(outmat)
+          system(paste0(cuda_path,"nodeKeepIndel ",prefix,"__M",j," ",keep_cutoff))
+        }
+        if(file.size(paste0(prefix,"__M",j,".retainNode"))==0){
+          nodes_retain<-integer()
+        }else{
+          nodes_retain<-read.table(file=paste0(prefix,"__M",j,".retainNode"))[,1]+1
+          nodes_retain<-sort(nodes_retain)
+        }
+        unlink(paste0(prefix,"__M",j,".edge2"))
+        unlink(paste0(prefix,"__M",j,".nodeState2"))
+        unlink(paste0(prefix,"__M",j,".tboutmat"))
+        unlink(paste0(prefix,"__M",j,".retainNode"))
+        node_mat<-node_mat[,nodes_retain-Ntip(phy)]
+      }
+    }
+    if(length(nodes_retain)==0){
+      return(list(phys=list(),category=rep(0,length(inIdx)),ansState=node_mat,isbroken=T,inIdx=inIdx))
+    }else{
+      tmp<-phy.break(phy,nodes_retain)
+      broken_phys<-tmp$phys
+      category<-tmp$category
+      return(list(phys=broken_phys,category=category[tip2pseudo],ansState=node_mat,isbroken=T,inIdx=inIdx))
+    }
+  }
+  #########
+  
+  if(length(keep_cutoff)==1){
+    keep_cutoff_original<-c(keep_cutoff,keep_cutoff)
+  }else{
+    keep_cutoff_original<-keep_cutoff
+  }
+  keep_cutoff<-keep_cutoff_original[1]
+  wfile<-paste0(prefix,".w",sep="")
+  if(!bit_coded){
+    mat<-regularize.mat(mat,mat)
+    if(is.null(weight)){
+      tmp<-mat2bit(mat,return.bit=F)
+      w<-matrix(1,max(diff(tmp$loci)),ncol(mat))
+      rm(tmp)
+    }else{
+      w<-weight
+    }
+    writeBin(as.numeric(t(w)),con=wfile)
+  }else{
+    if(is.null(weight)){
+      w<-rep(1,ncol(mat)*32)
+    }else{
+      w<-weight
+    }
+    writeBin(as.numeric(w),con=wfile)
+  }
+  
+  if(!all(splt[,ncol(splt)]==0)){
+    splt<-cbind(splt,0)
+  }
+  max_mg_idx<-max(splt)
+  phys<-list()
+  tipname<-rownames(mat)
+  if(file_backed){
+    fpath<-gsub("[^/]+$","",prefix)
+    fname<-paste0(gsub(fpath,"",prefix),".bk")
+    bigmat<-big.matrix(
+      nrow=ncol(mat),
+      ncol=nrow(mat)*2,
+      type="integer",
+      backingfile=fname,
+      backingpath=fpath,
+      descriptorfile=paste0(fname,".desc")
+    )
+  }else{
+    bigmat<-big.matrix(
+      nrow=ncol(mat),
+      ncol=nrow(mat)*2,
+      type="integer"
+    )
+  }
+  bigmat[,1:nrow(mat)]<-t(mat)
+  rm(mat)
+  mat_desc<-describe(bigmat)
+  layer<-ncol(splt)-1
+  
+  while(layer>=1){
+    if(layer==1){
+      phySize<-get.phySize(splt[,2])
+      #      if(phySize>sizeBound&bit_coded){
+      if(0){
+        cat(as.character(Sys.time()),"splitting backbone tree, No. tips:",phySize,fill=T)
+        matTmp<-gen.mat3(mat,1:nrow(splt),ansMat,splt[,2])
+        idxTmp<-matTmp$idx
+        res<-autoSplit(
+          mat=matTmp$submat,prefix=prefix,weight=w,data_type="binary",
+          radius_initial=radius_initial,
+          fixed=F,step=tryStep,radius_bound=tryStep,
+          sizeBound=c(sizeBound,0L),cuda_path=cuda_path
+        )
+        rm(matTmp)
+
+        spltTmp<-res[[2]]
+        spltTmp<-regularize.split(spltTmp,min_size=10)
+        nPseudoTip<-get.phySize(spltTmp)
+        if(nPseudoTip<phySize*0.75){
+          spltTmp<-addOffset(spltTmp,max(splt))
+          spltTmp<-spltTmp[idxTmp]
+          splt<-cbind(1,spltTmp,splt[,2:ncol(splt)])
+          max_mg_idx<-max(splt)
+          layer<-2
+          keep_cutoff<-keep_cutoff_original[2]
+          next
+        }else{
+          cat(as.character(Sys.time()),"splitting backbone tree failed, perform direct reconstruction",fill=T)
+        }
+      }
+    }
+    
+    writeBin(as.numeric(w),con=wfile)
+    clustIdx<-setdiff(sort(unique(splt[,layer])),0)
+    clusterSize<-sapply(clustIdx,function(x){
+      inTip<-splt[splt[,layer]==x,layer+1]
+      return(get.phySize(inTip))
+    })
+    cat(
+      as.character(Sys.time()),
+      "layer:",layer,
+      "No. clusters:",length(clustIdx),
+      "max size:",max(clusterSize),"\n",fill=F
+    )
+    # clustIdx<-clustIdx[order(clusterSize,decreasing=T)]
+    set.seed(1)
+    if(length(clustIdx)>1){
+      clustIdx<-sample(clustIdx,length(clustIdx))
+    }
+
+    if(ncore>1&length(clustIdx)>1){
+      nProcessed<-0
+      partial_res_collected<-list()
+      while(nProcessed<length(clustIdx)){
+        cl<-makeForkCluster(max(min(ncore,length(clustIdx)-nProcessed),4))
+        tmp<-parLapply(cl,clustIdx[(nProcessed+1):min(nProcessed+batch_size,length(clustIdx))],partial.join)
+        stopCluster(cl)
+        nProcessed<-min(nProcessed+batch_size,length(clustIdx))
+        partial_res_collected<-c(partial_res_collected,tmp)
+        cat("nProcessed:",nProcessed,fill=T)
+      }
+    }else{
+      partial_res_collected<-list()
+      for(j in clustIdx){
+        partial_res_collected<-c(partial_res_collected,list(partial.join(j)))
+      }
+    }
+
+    cat(as.character(Sys.time()),"summerizing layer ",layer,fill=T)
+    res_packed<-layer.summarize(partial_res_collected,clustIdx,splt,layer)
+    phys<-c(phys,res_packed$phys)
+    if(!is.null(res_packed$ansMat)){
+      bigmat[,1:ncol(res_packed$ansMat)+length(tipname)]<-res_packed$ansMat
+      tipname<-c(tipname,colnames(res_packed$ansMat))
+    }
+    splt<-res_packed$splt
+    cat(as.character(Sys.time())," layer ",layer," finished",fill=T)
+    layer<-layer-1
+  }
+  unlink(wfile)
+  rm(bigmat)
+  gc()
+  if(file_backed){
+    unlink(paste0(prefix,".bk"))
+    unlink(paste0(prefix,".bk.desc"))
+  }
+  return(phys)
+}
+h.partial.join<-function(
+    mat,splt,bit_coded=F,weight=NULL,keep_cutoff=1,
+    prefix="./",cuda_path=NULL,cuda_threshold=500,
+    ncore=1,verbose=T
+){
+  sizeBound=100000L
+  radius_initial=0L
+  tryStep=0L
+  ancestralType=1
+  sizeOfTips=rep(1,nrow(mat))
+  minSize=0
+  minRatio=2
+  recycle_mem=0
+  file_backed=F
+  
+  if(recycle_mem){
+    h.partial.join.bigMem(
+      mat=mat,
+      splt=splt,
+      bit_coded=bit_coded,
+      weight=weight,
+      keep_cutoff=keep_cutoff,
+      sizeBound=sizeBound,
+      radius_initial=radius_inital,
+      tryStep=tryStep,
+      ancestralType=ancestralType,
+      sizeOfTips=sizeOfTips,
+      minSize=minSize,
+      minRatio=minRatio,
+      prefix=prefix,
+      cuda_path=cuda_path,
+      cuda_threshold=cuda_threshold,
+      file_backed=file_backed,
+      ncore=ncore,
+      batch_size=recycle_mem,
+      verbose=verbose
+    )
+  }else{
+    h.partial.join.inMem(
+      mat=mat,
+      splt=splt,
+      bit_coded=bit_coded,
+      weight=weight,
+      keep_cutoff=keep_cutoff,
+      sizeBound=sizeBound,
+      radius_initial=radius_inital,
+      tryStep=tryStep,
+      ancestralType=ancestralType,
+      sizeOfTips=sizeOfTips,
+      minSize=minSize,
+      minRatio=minRatio,
+      prefix=prefix,
+      cuda_path=cuda_path,
+      cuda_threshold=cuda_threshold,
+      ncore=ncore,
+      verbose=verbose
+    )
+  }
+}
+
+run.split<-function(
+    mat,splt=NULL,idx=NULL,prefix,weight=NULL,data_type="DNA",
+    radius_initial=100L,fixed=F,
+    step=ceiling(radius_initial/10),radius_bound=ceiling(radius_initial/10),
+    nReplicate=1024L,sizeBound=c(0L,0L),ratio_bound=1.2,nNeighborBound=9.5,
+    p_shared=0.8,min_size=10,try_limit=20,cuda_path=NULL
+    ){
+  if(is.null(splt)){
+    res<-autoSplit(
+      mat=mat,prefix=prefix,weight=weight,data_type=data_type,
+      radius_initial=radius_initial,fixed=fixed,
+      step=step,radius_bound=radius_bound,
+      sizeBound=sizeBound,min_size=min_size,try_limit=try_limit,cuda_path=cuda_path
+    )
+    cat("radius:",res[[1]],fill=T)
+    spltTmp<-regularize.split(res[[2]],min_size=min_size)
+    splt<-cbind(1,addOffset(spltTmp,1))
+  }else{
+    layer<-which(apply(splt,2,function(x){
+      idx%in%x
+    }))
+    if(layer==ncol(splt)){
+      splt<-cbind(splt,0)
+    }
+    inIdx<-which(splt[,layer]==idx)
+    cat(as.character(Sys.time())," spliting group ",idx," in layer ",layer,": ",length(inIdx)," tips",sep="",fill=T)
+    if(data_type=="binary"){
+      matTmp<-mat[inIdx,]
+    }else{
+      matTmp<-mat[,inIdx]
+    }
+    res<-autoSplit(
+      mat=matTmp,prefix=prefix,weight=weight,data_type=data_type,
+      radius_initial=radius_initial,fixed=fixed,
+      step=step,radius_bound=radius_bound,
+      sizeBound=sizeBound,min_size=min_size,try_limit=try_limit,cuda_path=cuda_path
+    )
+    cat("radius:",res[[1]],fill=T)
+    spltTmp<-regularize.split(res[[2]],min_size=min_size)
+    splt[inIdx,layer+1]<-addOffset(spltTmp,max(splt))
+  }
+  return(splt)
+}
