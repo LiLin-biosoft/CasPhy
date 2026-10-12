@@ -2,8 +2,8 @@
     "sortOrder": [
         {
             "columnIndex": 2,
-            "ascending": false
+            "ascending": true
         }
     ],
-    "path": "D:/github/CasPhy2/R"
+    "path": "D:/github/CasPhy"
 }

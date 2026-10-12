@@ -11,7 +11,7 @@
 
 <meta name="author" content="Li Lin" />
 
-<meta name="date" content="2026-10-11" />
+<meta name="date" content="2026-10-12" />
 
 <title>CasPhy</title>
 
@@ -1516,7 +1516,7 @@ border-radius: 0px;
 
 <h1 class="title toc-ignore">CasPhy</h1>
 <h4 class="author">Li Lin</h4>
-<h4 class="date">2026-10-11</h4>
+<h4 class="date">2026-10-12</h4>
 
 </div>
 
@@ -1528,7 +1528,9 @@ row is an OTU (operational taxonomic unit) and each column is a editable
 site. <code>-1</code> is missing data, <code>0</code> is un-mutated
 state and other integers are edited indels. The <code>rownames</code> of
 <code>mat</code> must be specified. <code>regularize.mat</code> relabels
-edited indels by consecutive integers.</p>
+edited indels by consecutive integers. The first parameter is the matrix
+to be relabeled, and the second parameter is the matrix used as a
+reference (containing all potential indels).</p>
 <pre><code>suppressMessages(library(CasPhy))
 suppressMessages(library(RColorBrewer))
 
@@ -1817,7 +1819,7 @@ bs_value&lt;-cal.bs(final_tree,bstrees,ncore=10)</code></pre>
 <p>First, use <code>fasta2bin</code> in linux shell to convert fasta
 file <code>run1_1024.fasta</code> to bin file
 <code>run1_1024.bin</code>.</p>
-<pre><code>~/CasPhy-cuda/build/fasta2bin run1_1024.fasta run1_1024</code></pre>
+<pre><code>~/CasPhy/fasta2bin run1_1024.fasta run1_1024</code></pre>
 <p>Then, read the bin file and the true phylogeny. For DNA sequence
 data, each column is an OTU.</p>
 <pre><code>mat&lt;-read.bin2mat(&quot;run1_1024.bin&quot;)
@@ -1972,16 +1974,15 @@ even if they do not appear in the maximum parsimony tree.</p>
 <p>Finally, we calculate the bootstrap values for all clades in the
 consensus tree.</p>
 <pre><code>bootstrap_value&lt;-cal.abs(consensus_tree,phys,prefix=&quot;test&quot;,threshold=0.05,ncore=11)</code></pre>
-<p>The first column of <code>bootstrap_value</code> contains the node
-indices. The second column contains the bootstrap values, defined as the
+<p>The first column contains the bootstrap values, defined as the
 proportion of trees that contain a similar clade with transfer support
-greater than <code>1 - threshold</code>. The third column contains the
-clade sizes. The bootstrap values of a few clades may be below 0.5.
-These represent clades that are absent from the maximum parsimony
-phylogeny. CasPhy attempted to reconstruct them in the consensus
-phylogeny but was unsuccessful. If you do not need clades that are
-absent from the maximum parsimony phylogeny, you can directly calculate
-the bootstrap values in the maximum parsimony phylogeny:</p>
+greater than <code>1 - threshold</code>. The second column contains the
+clade sizes (No. of OTUs). The bootstrap values of a few clades may be
+below 0.5. These represent clades that are absent from the maximum
+parsimony phylogeny. CasPhy attempted to reconstruct them in the
+consensus phylogeny but was unsuccessful. If you do not need clades that
+are absent from the maximum parsimony phylogeny, you can directly
+calculate the bootstrap values in the maximum parsimony phylogeny:</p>
 <pre><code>bootstrap_value&lt;-cal.abs(phys[[1]],phys,prefix=&quot;test&quot;,threshold=0.05,ncore=11)</code></pre>
 </div>
 

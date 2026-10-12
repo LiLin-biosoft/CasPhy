@@ -17,7 +17,7 @@ vignette: >
 
 ## Example of small size CRISPR-Cas9 lineage-tracing data
 
-`mat1k` contains the mutation profiles of 1000 cells. Each row is an OTU (operational taxonomic unit) and each column is a editable site. `-1` is missing data, `0` is un-mutated state and other integers are edited indels. The `rownames` of `mat` must be specified. `regularize.mat` relabels edited indels by consecutive integers.
+`mat1k` contains the mutation profiles of 1000 cells. Each row is an OTU (operational taxonomic unit) and each column is a editable site. `-1` is missing data, `0` is un-mutated state and other integers are edited indels. The `rownames` of `mat` must be specified. `regularize.mat` relabels edited indels by consecutive integers. The first parameter is the matrix to be relabeled, and the second parameter is the matrix used as a reference (containing all potential indels).
 
 ```         
 suppressMessages(library(CasPhy))
@@ -297,7 +297,7 @@ bs_value<-cal.bs(final_tree,bstrees,ncore=10)
 First, use `fasta2bin` in linux shell to convert fasta file `run1_1024.fasta` to bin file `run1_1024.bin`.
 
 ```         
-~/CasPhy-cuda/build/fasta2bin run1_1024.fasta run1_1024
+~/CasPhy/fasta2bin run1_1024.fasta run1_1024
 ```
 
 Then, read the bin file and the true phylogeny. For DNA sequence data, each column is an OTU.
@@ -437,7 +437,7 @@ Finally, we calculate the bootstrap values for all clades in the consensus tree.
 bootstrap_value<-cal.abs(consensus_tree,phys,prefix="test",threshold=0.05,ncore=11)
 ```
 
-The first column of `bootstrap_value` contains the node indices. The second column contains the bootstrap values, defined as the proportion of trees that contain a similar clade with transfer support greater than `1 - threshold`. The third column contains the clade sizes. The bootstrap values of a few clades may be below 0.5. These represent clades that are absent from the maximum parsimony phylogeny. CasPhy attempted to reconstruct them in the consensus phylogeny but was unsuccessful. If you do not need clades that are absent from the maximum parsimony phylogeny, you can directly calculate the bootstrap values in the maximum parsimony phylogeny:
+The first column contains the bootstrap values, defined as the proportion of trees that contain a similar clade with transfer support greater than `1 - threshold`. The second column contains the clade sizes (No. of OTUs). The bootstrap values of a few clades may be below 0.5. These represent clades that are absent from the maximum parsimony phylogeny. CasPhy attempted to reconstruct them in the consensus phylogeny but was unsuccessful. If you do not need clades that are absent from the maximum parsimony phylogeny, you can directly calculate the bootstrap values in the maximum parsimony phylogeny:
 
 ```         
 bootstrap_value<-cal.abs(phys[[1]],phys,prefix="test",threshold=0.05,ncore=11)
