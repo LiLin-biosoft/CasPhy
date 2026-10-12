@@ -14,7 +14,7 @@ Download CasPhy and compile the CUDA scripts. The `-arch` flag must be set accor
 ```
 git clone https://github.com/LiLin-biosoft/CasPhy.git
 cd CasPhy
-for i in $(ls cu/|sed 's/.cu//'); nvcc ${i}.cu -o ${i} -arch=sm_120;done
+for i in $(ls cu/|sed 's/\.cu//'); do nvcc cu/${i}.cu -o ${i} -arch=sm_120;done
 ```
 In the R console, install CasPhy and its dependencies:
 ```
