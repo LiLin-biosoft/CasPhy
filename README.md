@@ -1,6 +1,8 @@
 # CasPhy
+Li Lin<br>
 
-Li Lin<br> \## Introduction CasPhy is an ultrafast phylogenetic reconstruction algorithm designed for lineage-tracing data and conventional multiple sequence alignment (MSAs).
+## Introduction
+CasPhy is an ultrafast phylogenetic reconstruction algorithm designed for lineage-tracing data and conventional multiple sequence alignment (MSAs).
 
 ## Requirements
 
