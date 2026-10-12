@@ -1,33 +1,29 @@
 # CasPhy
 
 Li Lin<br>
+## Introduction
+CasPhy is an ultrafast phylogenetic reconstruction algorithm designed for lineage-tracing data and conventional multiple sequence alignment (MSA).
 
-CasPhy is an ultrafast phylogenetic reconstruction algorithm. It can be installed from Github:<br>
+## Requirements
+* CUDA Toolkit >12.9
+* R >4.0.0
+* R packages `ape`, `bigmemory`, and `jsonlite`
 
-```         
-install.packages('devtools')  
-devtools::install_github("LiLin-biosoft/CasPhy", build_vignettes = T)
-browseVignettes('CasPhy')  ## if you encounter any problem in building vignettes, there is one copy in vignettes.html.
+## Installation
+Download CasPhy and compile the CUDA scripts. The `-arch` flag must be set according to the compute capability of your GPU.
 ```
-
-To use GPU acceleration, CUDA script is required:<br>
-
-```         
-git clone https://github.com/LiLin-biosoft/CasPhy-cuda.git
-cd CasPhy-cuda
-mkdir build
-cd build
-cmake ..
-make
+git clone https://github.com/LiLin-biosoft/CasPhy.git
+cd CasPhy
+for i in $(ls cu/|sed 's/.cu//'); nvcc ${i}.cu -o ${i} -arch=sm_120;done
 ```
-or
-
-```         
-git clone https://github.com/LiLin-biosoft/CasPhy-cuda.git
-cd CasPhy-cuda
-mkdir build
-cd build
-cmake -DCUDA_ARCH=89 .. ## set compute capacity to 89 for RTX 40 series
-make
+In the R console, install CasPhy and its dependencies:
 ```
-To perform phylogenetic reconstruction on DNA sequences, VeryFastTree is required(<https://github.com/citiususc/veryfasttree>).
+install.packages("ape")
+install.packages("bigmemory")
+install.packages("jsonlite")
+install.packages("CasPhy_1.5.7.tar.gz")
+
+```
+To buid phylogenies from MSA using VeryFastTree, VeryFastTree (<https://github.com/citiususc/veryfasttree>) is required.
+To buid phylogenies from MSA using RAxML-ng, RAxML-ng (<https://github.com/amkozlov/raxml-ng/>) and EPA-ng (<https://github.com/pierrebarbera/epa-ng>) is required.
+An HTML tutorial is available at `tutorial.html`.
