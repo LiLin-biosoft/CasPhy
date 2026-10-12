@@ -5,8 +5,8 @@ Li Lin<br>
 CasPhy is an ultrafast phylogenetic reconstruction algorithm designed for lineage-tracing data and conventional multiple sequence alignment (MSA).
 
 ## Requirements
-* CUDA Toolkit >12.9
-* R >4.0.0
+* CUDA Toolkit >=12.9
+* R >=4.0.0
 * R packages `ape`, `bigmemory`, and `jsonlite`
 
 ## Installation
