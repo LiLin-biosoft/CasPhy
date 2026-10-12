@@ -17,7 +17,7 @@ vignette: >
 
 ## Example of small size CRISPR-Cas9 lineage-tracing data
 
-`mat1k` contains the mutation profiles of 1000 cells. Each row is an OTU (operational taxonomic unit) and each column is a editable site. `-1` is missing data, `0` is un-mutated state and other integers are edited indels. The `rownames` of `mat` must be specified. `regularize.mat` relabels edited indels by consecutive integers. The first parameter is the matrix to be relabeled, and the second parameter is the matrix used as a reference (containing all potential indels).
+To run the following scripts, the R packages `RColorBrewer` and `phangorn` are required to plot figures and calculate the Robinson-Foulds distance. CasPhy itself does not depend on these packages, so you may skip these steps if you prefer. `mat1k` contains the mutation profiles of 1000 cells. Each row is an OTU (operational taxonomic unit) and each column is a editable site. `-1` is missing data, `0` is un-mutated state and other integers are edited indels. The `rownames` of `mat` must be specified. `regularize.mat` relabels edited indels by consecutive integers. The first parameter is the matrix to be relabeled, and the second parameter is the matrix used as a reference (containing all potential indels).
 
 ```         
 suppressMessages(library(CasPhy))
