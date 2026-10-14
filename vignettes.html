@@ -11,7 +11,7 @@
 
 <meta name="author" content="Li Lin" />
 
-<meta name="date" content="2026-10-12" />
+<meta name="date" content="2026-10-14" />
 
 <title>CasPhy</title>
 
@@ -1516,14 +1516,18 @@ border-radius: 0px;
 
 <h1 class="title toc-ignore">CasPhy</h1>
 <h4 class="author">Li Lin</h4>
-<h4 class="date">2026-10-12</h4>
+<h4 class="date">2026-10-14</h4>
 
 </div>
 
 
 <div id="example-of-small-size-crispr-cas9-lineage-tracing-data" class="section level2">
 <h2>Example of small size CRISPR-Cas9 lineage-tracing data</h2>
-<p><code>mat1k</code> contains the mutation profiles of 1000 cells. Each
+<p>To run the following scripts, the R packages
+<code>RColorBrewer</code> and <code>phangorn</code> are required to plot
+figures and calculate the Robinson-Foulds distance. CasPhy itself does
+not depend on these packages, so you may skip these steps if you prefer.
+<code>mat1k</code> contains the mutation profiles of 1000 cells. Each
 row is an OTU (operational taxonomic unit) and each column is a editable
 site. <code>-1</code> is missing data, <code>0</code> is un-mutated
 state and other integers are edited indels. The <code>rownames</code> of
@@ -1843,14 +1847,16 @@ value will not strongly affect the results. <code>pct_threshold</code>
 is the threshold for the percentage of outgroups placed in one branch.
 If more outgroups than this value are placed in one branch, the branch
 is broken. <code>nbp_threshold</code> is the threshold for recognizing
-distantly related outgroups. Outgroups with fewer shared nucleotides
-than this value are not taken into account. <code>file_backed</code> is
-a parameter passed to the bigmemory package specifying whether the
-matrix is stored in memory or in a file. <code>vft_cmd</code> is the
-running command for VeryFastTree. <code>-nt</code>, specifying the input
-file, is added automatically. Other options can be specified in this
-string. After phylogenetic reconstruction, the result is compared with
-the true phylogeny using the Robinson-Foulds distance.</p>
+distantly related outgroups. In default
+(<code>nbp_threshold=NULL</code>), it is set to 5% of sequence length.
+Outgroups with fewer shared nucleotides than this value are not taken
+into account. <code>file_backed</code> is a parameter passed to the
+bigmemory package specifying whether the matrix is stored in memory or
+in a file. <code>vft_cmd</code> is the running command for VeryFastTree.
+<code>-nt</code>, specifying the input file, is added automatically.
+Other options can be specified in this string. After phylogenetic
+reconstruction, the result is compared with the true phylogeny using the
+Robinson-Foulds distance.</p>
 <pre><code>phys&lt;-h.partial.join.vft(
   input_file=&quot;run1_1024.bin&quot;,
   splt=splt,

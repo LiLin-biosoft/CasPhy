@@ -173,11 +173,16 @@ partial.join.vft<-function(j,mat_desc,tipname,matfile,splt,layer,prefix,cuda_pat
   return(list(phys=broken_phys,category=category[tip2pseudo],ansState=node_mat,isbroken=T,inIdx=inIdx))
 }
 
-h.partial.join.vft<-function(input_file,splt,prefix,sample_size=1,pct_threshold=0.001,nbp_threshold=1000,file_backed=F,
+h.partial.join.vft<-function(input_file,splt,prefix,sample_size=1,pct_threshold=0.001,nbp_threshold=NULL,file_backed=F,
                              vft_cmd="VeryFastTree -nosupport -fastest -threads 8",cuda_path,ncore){
+  
   cat(as.character(Sys.time()),"pvft start",fill=T)
   ntip<-nrow(splt)
   mat<-read.bin2mat(input_file)
+  if(is.null(nbp_threshold)){
+    nbp_threshold<-ceiling(nrow(mat)*4*0.05)
+  }
+  
   matfile<-paste0(prefix,".bin.tmp")
   write.mat2bin(mat,file=matfile,extraCols=floor(ntip*0.5))
   rm(mat)
