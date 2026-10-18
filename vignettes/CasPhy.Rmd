@@ -46,7 +46,7 @@ smj_tree<-insert.dup(smj_tree,dup_idx,label=rownames(mat))
 smj_tree<-collapse.infoless(smj_tree,mat)
 ```
 
-Use `heatmap` to see the results.
+Use `heatmap` to view the results. The phylogeny should be consistent with the mutations profiles.
 
 ```         
 heatmap(
@@ -117,7 +117,7 @@ final_tree<-insert.dup(final_tree,dup_idx,label=rownames(mat))
 final_tree<-collapse.infoless(final_tree,mat)
 ```
 
-Use `heatmap` to see the results. The data contains cells from multiple clones.
+Use `heatmap` to view the results. You should see many small blocks with similar mutation profiles, as the data contains cells from multiple clones.
 
 ```         
 heatmap(
@@ -209,7 +209,7 @@ heatmap(
 )
 ```
 
-Phylogeny built by parallel computing.
+Phylogeny built by parallel computing. In heatmap, the phylogeny should be consistent with the mutations profiles.
 
 ```         
 splt<-run.split(
@@ -318,7 +318,7 @@ splt<-run.split(
 head(splt.summerize(splt),n=20)
 ```
 
-CasPhy currently supports phylogenetic reconstruction using either VeryFastTree or RAxML. We begin with the VeryFastTree version. `input_file` is the filename of the input data. `sample_size` is the proportion of outgroups sampled for placement. For small datasets, it is set to 1 (using all outgroups). For large datasets (\>100,000 OTUs), it can be set to a smaller value (e.g., 0.5) to reduce the GPU workload. In large datasets, a smaller value will not strongly affect the results. `pct_threshold` is the threshold for the percentage of outgroups placed in one branch. If more outgroups than this value are placed in one branch, the branch is broken. `nbp_threshold` is the threshold for recognizing distantly related outgroups. In default (`nbp_threshold=NULL`), it is set to 5% of sequence length. Outgroups with fewer shared nucleotides than this value are not taken into account. `file_backed` is a parameter passed to the bigmemory package specifying whether the matrix is stored in memory or in a file. `vft_cmd` is the running command for VeryFastTree. `-nt`, specifying the input file, is added automatically. Other options can be specified in this string. After phylogenetic reconstruction, the result is compared with the true phylogeny using the Robinson-Foulds distance.
+CasPhy currently supports phylogenetic reconstruction using either VeryFastTree or RAxML. We begin with the VeryFastTree version. `input_file` is the filename of the input data. `sample_size` is the proportion of outgroups sampled for placement. For small datasets, it is set to 1 (using all outgroups). For large datasets (\>100,000 OTUs), it can be set to a smaller value (e.g., 0.5) to reduce the GPU workload. In large datasets, a smaller value will not strongly affect the results. `pct_threshold` is the threshold for the percentage of outgroups placed in one branch. If more outgroups than this value are placed in one branch, the branch is broken. `nbp_threshold` is the threshold for recognizing distantly related outgroups. In default (`nbp_threshold=NULL`), it is set to 5% of sequence length. Outgroups with fewer shared nucleotides than this value are not taken into account. `file_backed` is a parameter passed to the bigmemory package specifying whether the matrix is stored in memory or in a file. `vft_cmd` is the running command for VeryFastTree. `-nt`, specifying the input file, is added automatically. Other options can be specified in this string. After phylogenetic reconstruction, the result is compared with the true phylogeny using the Robinson-Foulds distance (near 0.12). 
 
 ```         
 phys<-h.partial.join.vft(
