@@ -29,6 +29,7 @@ install.packages("bigmemory")
 install.packages("jsonlite")
 install.packages("CasPhy_1.5.7.tar.gz")
 ```
+Installation will take several minutes.
 
 To buid phylogenies from MSA using VeryFastTree, VeryFastTree (<https://github.com/citiususc/veryfasttree>) is required.
 
