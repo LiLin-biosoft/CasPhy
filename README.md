@@ -31,8 +31,8 @@ install.packages("CasPhy_1.5.7.tar.gz")
 ```
 Installation will take several minutes.
 
-To buid phylogenies from MSA using VeryFastTree, VeryFastTree (<https://github.com/citiususc/veryfasttree>) is required.
+To buid phylogenies from MSA using VeryFastTree, VeryFastTree (<https://github.com/citiususc/veryfasttree>; developed on version 4.0.5) is required.
 
-To buid phylogenies from MSA using RAxML-ng, RAxML-ng (<https://github.com/amkozlov/raxml-ng/>) and EPA-ng (<https://github.com/pierrebarbera/epa-ng>) is required.
+To buid phylogenies from MSA using RAxML-ng (developed on version 1.2.2), RAxML-ng (<https://github.com/amkozlov/raxml-ng/>; developed on version 1.2.2) and EPA-ng (<https://github.com/pierrebarbera/epa-ng>; developed on version 0.3.8) is required.
 
 An HTML tutorial is available at `vignettes.html`. Data files used in tutorial can be found in `examples/`.
